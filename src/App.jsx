@@ -1,65 +1,79 @@
 import React, { useEffect, useState } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from './firebase/config'
-import LoginPage  from './pages/LoginPage'
-import Topbar     from './components/Topbar'
-import DiagramTab from './components/DiagramTab'
-import DictTab    from './components/DictTab'
-import Statusbar  from './components/Statusbar'
+import LoginPage    from './pages/LoginPage'
+import Sidebar      from './components/Sidebar'
+import InicioTab    from './components/InicioTab'
+import DashboardTab from './components/DashboardTab'
+import DiagramTab   from './components/DiagramTab'
+import DictTab      from './components/DictTab'
+import TareasTab      from './components/TareasTab'
+import CalendarioTab  from './components/CalendarioTab'
+import PAESTab        from './components/PAESTab'
+import AsistenteTab   from './components/AsistenteTab'
+import FloatingChat   from './components/FloatingChat'
+
+function PlaceholderTab({ name }) {
+  return (
+    <div className="placeholder-page">
+      <div style={{ fontSize: '44px', opacity: .15, marginBottom: '8px' }}>◎</div>
+      <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text1)' }}>{name}</h2>
+      <p style={{ color: 'var(--text2)', fontSize: '13px' }}>Disponible en la próxima etapa</p>
+    </div>
+  )
+}
 
 export default function App() {
-  const [user, setUser]       = useState(undefined) // undefined = loading
-  const [tab, setTab]         = useState('diagram')
-  const [info, setInfo]       = useState('—')
-  const [status, setStatus]   = useState('loading')
+  const [user, setUser]           = useState(undefined)
+  const [tab, setTab]             = useState('inicio')
+  const [sidebarOpen, setSidebar] = useState(true)
+  const [theme, setTheme]         = useState(() => localStorage.getItem('cd-theme') || 'dark')
+  const [info, setInfo]           = useState('')
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, u => {
-      setUser(u)
-      setStatus(u ? 'ok' : 'ok')
-    })
-    return unsub
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('cd-theme', theme)
+  }, [theme])
+
+  useEffect(() => {
+    return onAuthStateChanged(auth, setUser)
   }, [])
 
-  // Loading splash
   if (user === undefined) {
     return (
       <div style={{
         height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--bg0)', fontFamily: "'IBM Plex Mono', monospace",
-        fontSize: '11px', color: 'var(--text2)',
+        background: 'var(--bg0)', color: 'var(--text2)', fontSize: '13px',
       }}>
-        iniciando...
+        Iniciando...
       </div>
     )
   }
 
-  // Not logged in
   if (!user) return <LoginPage />
 
-  // App
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <Topbar
+    <div className="app-shell">
+      <Sidebar
+        collapsed={!sidebarOpen}
+        onToggle={() => setSidebar(s => !s)}
         activeTab={tab}
         onTabChange={setTab}
-        info={info}
+        user={user}
+        theme={theme}
+        onThemeToggle={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
       />
-
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {tab === 'diagram' && (
-          <DiagramTab uid={user.uid} onInfo={setInfo} />
-        )}
-        {tab === 'dict' && (
-          <DictTab uid={user.uid} onInfo={setInfo} />
-        )}
+      <div className="app-content">
+        {tab === 'inicio'     && <InicioTab    uid={user.uid} />}
+        {tab === 'dashboard'  && <DashboardTab uid={user.uid} onInfo={setInfo} />}
+        {tab === 'diagram'    && <DiagramTab   uid={user.uid} onInfo={setInfo} />}
+        {tab === 'dict'       && <DictTab      uid={user.uid} onInfo={setInfo} />}
+        {tab === 'tareas'     && <TareasTab uid={user.uid} />}
+        {tab === 'calendario' && <CalendarioTab uid={user.uid} />}
+        {tab === 'paes'       && <PAESTab uid={user.uid} />}
+        {tab === 'asistente'  && <AsistenteTab uid={user.uid} />}
       </div>
-
-      <Statusbar
-        status={status}
-        info={info}
-        user={user.email}
-      />
+      {tab !== 'asistente' && <FloatingChat uid={user.uid} />}
     </div>
   )
 }

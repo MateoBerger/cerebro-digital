@@ -1,6 +1,6 @@
 import {
   collection, doc, getDocs, setDoc, updateDoc,
-  deleteDoc, onSnapshot, serverTimestamp, writeBatch
+  deleteDoc, onSnapshot, serverTimestamp, writeBatch, addDoc, query, orderBy, limit,
 } from 'firebase/firestore'
 import { db } from './config'
 import { DEFAULT_VARIABLES, DEFAULT_DIAGRAM } from './defaults'
@@ -61,5 +61,195 @@ export function subscribeDiagram(uid, callback) {
     } else {
       callback(DEFAULT_DIAGRAM)
     }
+  })
+}
+
+// ── CHECKINS ─────────────────────────────────────────────
+
+export async function saveCheckin(uid, date, data) {
+  await setDoc(doc(db, 'users', uid, 'checkins', date), {
+    ...data,
+    fecha: date,
+    updatedAt: serverTimestamp(),
+  })
+}
+
+export function subscribeCheckin(uid, date, callback) {
+  const ref = doc(db, 'users', uid, 'checkins', date)
+  return onSnapshot(ref, snap => {
+    callback(snap.exists() ? snap.data() : null)
+  })
+}
+
+// ── TAREAS ───────────────────────────────────────────────
+
+export function subscribeTareas(uid, callback) {
+  const ref = collection(db, 'users', uid, 'tareas')
+  return onSnapshot(ref, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  })
+}
+
+export async function addTarea(uid, tarea) {
+  const ref = collection(db, 'users', uid, 'tareas')
+  const id  = 'tarea_' + Date.now()
+  await setDoc(doc(ref, id), { ...tarea, completada: false, creadaEn: serverTimestamp() })
+  return id
+}
+
+export async function updateTarea(uid, id, fields) {
+  await updateDoc(doc(db, 'users', uid, 'tareas', id), { ...fields, actualizadaEn: serverTimestamp() })
+}
+
+export async function deleteTarea(uid, id) {
+  await deleteDoc(doc(db, 'users', uid, 'tareas', id))
+}
+
+// ── BLOQUES (Calendario) ──────────────────────────────────
+
+export function subscribeBloques(uid, callback) {
+  const ref = collection(db, 'users', uid, 'bloques')
+  return onSnapshot(ref, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  })
+}
+
+export async function addBloque(uid, bloque) {
+  const ref = collection(db, 'users', uid, 'bloques')
+  const id  = 'bloque_' + Date.now()
+  await setDoc(doc(ref, id), { ...bloque, creadaEn: serverTimestamp() })
+  return id
+}
+
+export async function updateBloque(uid, id, fields) {
+  await updateDoc(doc(db, 'users', uid, 'bloques', id), { ...fields, actualizadaEn: serverTimestamp() })
+}
+
+export async function deleteBloque(uid, id) {
+  await deleteDoc(doc(db, 'users', uid, 'bloques', id))
+}
+
+// ── PAES ─────────────────────────────────────────────────
+
+export function subscribePaesDoc(uid, docId, callback) {
+  const ref = doc(db, 'users', uid, 'paes', docId)
+  return onSnapshot(ref, snap => callback(snap.exists() ? snap.data() : {}))
+}
+
+export async function setPaesField(uid, docId, updates) {
+  await setDoc(doc(db, 'users', uid, 'paes', docId), updates, { merge: true })
+}
+
+export function subscribeEnsayos(uid, callback) {
+  const ref = collection(db, 'users', uid, 'ensayos')
+  return onSnapshot(ref, snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+}
+
+export async function addEnsayo(uid, ensayo) {
+  const id = 'ensayo_' + Date.now()
+  await setDoc(doc(db, 'users', uid, 'ensayos', id), { ...ensayo, creadaEn: serverTimestamp() })
+}
+
+export async function deleteEnsayo(uid, id) {
+  await deleteDoc(doc(db, 'users', uid, 'ensayos', id))
+}
+
+// ── PAES v2 — STATS ───────────────────────────────────────
+// users/{uid}/paes-stats (doc)
+
+export function subscribePaesStats(uid, callback) {
+  return onSnapshot(doc(db, 'users', uid, 'paes-stats'), snap => {
+    callback(snap.exists() ? snap.data() : null)
+  })
+}
+
+export async function updatePaesStats(uid, updates) {
+  await setDoc(doc(db, 'users', uid, 'paes-stats'), updates, { merge: true })
+}
+
+// ── PAES v2 — VOCAB ───────────────────────────────────────
+// users/{uid}/paes-vocab (doc)
+
+export function subscribePaesVocab(uid, callback) {
+  return onSnapshot(doc(db, 'users', uid, 'paes-vocab'), snap => {
+    callback(snap.exists() ? snap.data() : null)
+  })
+}
+
+export async function updatePaesVocab(uid, updates) {
+  await setDoc(doc(db, 'users', uid, 'paes-vocab'), updates, { merge: true })
+}
+
+// ── PAES v2 — PROFILE ─────────────────────────────────────
+// users/{uid}/paes-profile (doc)
+
+export function subscribePaesProfile(uid, callback) {
+  return onSnapshot(doc(db, 'users', uid, 'paes-profile'), snap => {
+    callback(snap.exists() ? snap.data() : null)
+  })
+}
+
+export async function updatePaesProfile(uid, updates) {
+  await setDoc(doc(db, 'users', uid, 'paes-profile'), { ...updates, updatedAt: serverTimestamp() }, { merge: true })
+}
+
+// ── PAES v2 — HISTORY ─────────────────────────────────────
+// users/{uid}/paes-history (collection)
+
+export function subscribePaesHistory(uid, callback) {
+  const q = query(collection(db, 'users', uid, 'paes-history'), orderBy('date', 'desc'), limit(20))
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  })
+}
+
+export async function addPaesHistory(uid, record) {
+  return addDoc(collection(db, 'users', uid, 'paes-history'), {
+    ...record,
+    date: record.date || new Date().toISOString().slice(0, 10),
+    creadoEn: serverTimestamp(),
+  })
+}
+
+// ── PAES v2 — ERRORS ──────────────────────────────────────
+// users/{uid}/paes-errors (collection)
+
+export function subscribePaesErrors(uid, callback) {
+  return onSnapshot(collection(db, 'users', uid, 'paes-errors'), snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  })
+}
+
+export async function addPaesError(uid, error) {
+  return addDoc(collection(db, 'users', uid, 'paes-errors'), {
+    ...error,
+    resolved:  false,
+    date:      new Date().toISOString().slice(0, 10),
+    creadoEn:  serverTimestamp(),
+  })
+}
+
+export async function updatePaesError(uid, id, fields) {
+  await updateDoc(doc(db, 'users', uid, 'paes-errors', id), { ...fields, actualizadoEn: serverTimestamp() })
+}
+
+export async function deletePaesError(uid, id) {
+  await deleteDoc(doc(db, 'users', uid, 'paes-errors', id))
+}
+
+// ── PAES v2 — EJERCICIOS (generados por IA) ───────────────
+// users/{uid}/paes-ejercicios (collection)
+
+export function subscribePaesEjercicios(uid, callback) {
+  const q = query(collection(db, 'users', uid, 'paes-ejercicios'), orderBy('generadoEn', 'desc'), limit(50))
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  })
+}
+
+export async function addPaesEjercicio(uid, ejercicio) {
+  return addDoc(collection(db, 'users', uid, 'paes-ejercicios'), {
+    ...ejercicio,
+    generadoEn: serverTimestamp(),
   })
 }
