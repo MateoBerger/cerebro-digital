@@ -155,42 +155,42 @@ export async function deleteEnsayo(uid, id) {
 }
 
 // ── PAES v2 — STATS ───────────────────────────────────────
-// users/{uid}/paes-stats (doc)
+// users/{uid}/paes-data/stats  (4 segmentos → doc válido)
 
 export function subscribePaesStats(uid, callback) {
-  return onSnapshot(doc(db, 'users', uid, 'paes-stats'), snap => {
+  return onSnapshot(doc(db, 'users', uid, 'paes-data', 'stats'), snap => {
     callback(snap.exists() ? snap.data() : null)
   })
 }
 
 export async function updatePaesStats(uid, updates) {
-  await setDoc(doc(db, 'users', uid, 'paes-stats'), updates, { merge: true })
+  await setDoc(doc(db, 'users', uid, 'paes-data', 'stats'), updates, { merge: true })
 }
 
 // ── PAES v2 — VOCAB ───────────────────────────────────────
-// users/{uid}/paes-vocab (doc)
+// users/{uid}/paes-data/vocab
 
 export function subscribePaesVocab(uid, callback) {
-  return onSnapshot(doc(db, 'users', uid, 'paes-vocab'), snap => {
+  return onSnapshot(doc(db, 'users', uid, 'paes-data', 'vocab'), snap => {
     callback(snap.exists() ? snap.data() : null)
   })
 }
 
 export async function updatePaesVocab(uid, updates) {
-  await setDoc(doc(db, 'users', uid, 'paes-vocab'), updates, { merge: true })
+  await setDoc(doc(db, 'users', uid, 'paes-data', 'vocab'), updates, { merge: true })
 }
 
 // ── PAES v2 — PROFILE ─────────────────────────────────────
-// users/{uid}/paes-profile (doc)
+// users/{uid}/paes-data/profile
 
 export function subscribePaesProfile(uid, callback) {
-  return onSnapshot(doc(db, 'users', uid, 'paes-profile'), snap => {
+  return onSnapshot(doc(db, 'users', uid, 'paes-data', 'profile'), snap => {
     callback(snap.exists() ? snap.data() : null)
   })
 }
 
 export async function updatePaesProfile(uid, updates) {
-  await setDoc(doc(db, 'users', uid, 'paes-profile'), { ...updates, updatedAt: serverTimestamp() }, { merge: true })
+  await setDoc(doc(db, 'users', uid, 'paes-data', 'profile'), { ...updates, updatedAt: serverTimestamp() }, { merge: true })
 }
 
 // ── PAES v2 — HISTORY ─────────────────────────────────────
