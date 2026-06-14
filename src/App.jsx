@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from './firebase/config'
-import { useGCalToken, consumeCalendarRedirectResult } from './hooks/useGCalToken'
+import { useGCalToken } from './hooks/useGCalToken'
 import LoginPage    from './pages/LoginPage'
 import Sidebar      from './components/Sidebar'
 import InicioTab    from './components/InicioTab'
@@ -41,15 +41,6 @@ export default function App() {
     return onAuthStateChanged(auth, setUser)
   }, [])
 
-  // Captura el accessToken de Google Calendar al volver de un redirect de auth
-  useEffect(() => {
-    consumeCalendarRedirectResult().then(at => {
-      if (!at) return
-      saveGcalToken(at)
-      setTab('calendario')
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   if (user === undefined) {
     return (
@@ -81,7 +72,7 @@ export default function App() {
         {tab === 'diagram'    && <DiagramTab   uid={user.uid} onInfo={setInfo} />}
         {tab === 'dict'       && <DictTab      uid={user.uid} onInfo={setInfo} />}
         {tab === 'tareas'     && <TareasTab uid={user.uid} />}
-        {tab === 'calendario' && <CalendarioTab uid={user.uid} gcalToken={gcalToken} />}
+        {tab === 'calendario' && <CalendarioTab uid={user.uid} gcalToken={gcalToken} onGcalToken={saveGcalToken} />}
         {tab === 'paes'       && <PAESTab uid={user.uid} />}
         {tab === 'asistente'  && <AsistenteTab uid={user.uid} />}
       </div>

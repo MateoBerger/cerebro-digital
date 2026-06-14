@@ -1,10 +1,8 @@
 import { useState } from 'react'
-import { reauthenticateWithRedirect, getRedirectResult, GoogleAuthProvider } from 'firebase/auth'
-import { auth } from '../firebase/config'
 
 const TOKEN_KEY  = 'gcal_token'
 const EXPIRY_KEY = 'gcal_token_exp'
-const TTL_MS     = 55 * 60 * 1000 // tokens duran 60 min, refrescamos a los 55
+const TTL_MS     = 55 * 60 * 1000 // tokens GIS duran 60 min, refrescamos a 55
 
 function loadToken() {
   const t   = sessionStorage.getItem(TOKEN_KEY)
@@ -12,30 +10,43 @@ function loadToken() {
   return t && Date.now() < exp ? t : null
 }
 
-// Escribe en sessionStorage — se llama desde LoginPage y desde App (redirect result)
+// Persiste el token — se llama desde LoginPage (login inicial) y desde el callback GIS
 export function saveGCalToken(accessToken) {
   sessionStorage.setItem(TOKEN_KEY, accessToken)
   sessionStorage.setItem(EXPIRY_KEY, String(Date.now() + TTL_MS))
 }
 
-// Inicia el flujo redirect hacia Google para pedir el scope de Calendar.
-// La pagina navega completamente; no hay valor de retorno.
-export function startCalendarAuthRedirect() {
-  const provider = new GoogleAuthProvider()
-  provider.addScope('https://www.googleapis.com/auth/calendar')
-  reauthenticateWithRedirect(auth.currentUser, provider)
-}
+/**
+ * Abre el selector de permisos de Google Identity Services para el scope Calendar.
+ * Evita COOP/CORS: GIS maneja su propio popup sin depender de Firebase.
+ * onToken(accessToken) se llama al completar con exito.
+ */
+export function requestCalendarAccess(onToken) {
+  const clientId = import.meta.env.VITE_GCAL_CLIENT_ID
+  const gis = window.google?.accounts?.oauth2
 
-// Recupera el resultado de un redirect previo (si existe).
-// Retorna el accessToken o null. Firebase limpia el resultado despues de leerlo.
-export async function consumeCalendarRedirectResult() {
-  try {
-    const result = await getRedirectResult(auth)
-    const at = result?.credential?.accessToken
-    return at || null
-  } catch {
-    return null
+  if (!clientId) {
+    console.error('[GCal] VITE_GCAL_CLIENT_ID no esta configurado')
+    return
   }
+  if (!gis) {
+    console.error('[GCal] Script de GIS aun no cargado (accounts.google.com/gsi/client)')
+    return
+  }
+
+  const client = gis.initTokenClient({
+    client_id: clientId,
+    scope: 'https://www.googleapis.com/auth/calendar',
+    callback: (resp) => {
+      if (resp.error || !resp.access_token) {
+        console.error('[GCal] Error GIS:', resp.error ?? 'sin access_token')
+        return
+      }
+      onToken(resp.access_token)
+    },
+  })
+
+  client.requestAccessToken()
 }
 
 export function useGCalToken() {
