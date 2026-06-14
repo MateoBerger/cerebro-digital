@@ -6,17 +6,23 @@ import {
   subscribeCheckin,
 } from '../firebase/db'
 
+function chileNow() {
+  // Devuelve un Date cuyo .getFullYear()/.getMonth()/.getDate()/.getDay()
+  // reflejan la hora local de Chile (America/Santiago), independiente del
+  // timezone del navegador.
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))
+}
+
 function getLocalDate() {
-  const d = new Date()
+  const d = chileNow()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function getWeekKey() {
-  const d = new Date()
-  const day  = d.getDay()
+  const d   = chileNow()
+  const day = d.getDay()
   const diff = day === 0 ? -6 : 1 - day
   d.setDate(d.getDate() + diff)
-  d.setHours(0, 0, 0, 0)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
@@ -65,7 +71,11 @@ export function useChat(uid) {
     const today = new Date()
     const fecha = today.toLocaleDateString('es-CL', {
       weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+      timeZone: 'America/Santiago',
     })
+    // 0=Lun…6=Dom, en zona horaria de Chile
+    const chileDate  = new Date(today.toLocaleString('en-US', { timeZone: 'America/Santiago' }))
+    const todayDia   = chileDate.getDay() === 0 ? 6 : chileDate.getDay() - 1
 
     const checkin = checkinHoy
       ? `Ganas de estudiar: ${checkinHoy.ganas_estudio}/10 | Energía: ${checkinHoy.energia}/10 | Ánimo: ${checkinHoy.animo}/10 | Tiempo libre: ${checkinHoy.tiempo_libre}`
@@ -78,10 +88,9 @@ export function useChat(uid) {
         ).join('\n')
       : 'Sin tareas pendientes'
 
-    const todayDow   = today.getDay() === 0 ? 6 : today.getDay() - 1
     const weekKey    = getWeekKey()
     const bloquesHoy = bloques
-      .filter(b => b.dia === todayDow && (!b.semana || b.semana === null || b.semana === weekKey))
+      .filter(b => b.dia === todayDia && (!b.semana || b.semana === null || b.semana === weekKey))
       .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio))
     const calStr = bloquesHoy.length
       ? bloquesHoy.map(b => `${b.horaInicio}–${b.horaFin}: ${b.titulo} (${b.tipo})`).join('\n')
@@ -91,7 +100,7 @@ export function useChat(uid) {
       ? `Racha: ${paesStats.streak || 0} días | Correctas: ${paesStats.correctAnswers || 0}/${paesStats.totalAnswers || 0} | Ensayos registrados: ${paesStats.essaysCount || 0}`
       : 'Sin datos PAES aún (usar sección PAES para registrar ensayos)'
 
-    return { fecha, checkin, tareas: tareasStr, calendario: calStr, paes: paesStr }
+    return { fecha, todayDia, checkin, tareas: tareasStr, calendario: calStr, paes: paesStr }
   }
 
   async function executeTool(name, toolInput) {
@@ -140,7 +149,7 @@ export function useChat(uid) {
         body:    JSON.stringify({ messages: newApiMsgs, context }),
       })
       const d1 = await r1.json()
-      if (d1.error) throw new Error(d1.error)
+      if (d1.error) throw new Error(typeof d1.error === 'string' ? d1.error : d1.error?.message || JSON.stringify(d1.error))
 
       if (d1.stop_reason === 'tool_use') {
         const textBefore = d1.content.find(b => b.type === 'text')?.text
@@ -168,6 +177,7 @@ export function useChat(uid) {
           }),
         })
         const d2 = await r2.json()
+        if (d2.error) throw new Error(typeof d2.error === 'string' ? d2.error : d2.error?.message || JSON.stringify(d2.error))
         const finalText = d2.content?.find(b => b.type === 'text')?.text || ''
         if (finalText) pushUi({ id: `a2-${Date.now()}`, role: 'assistant', text: finalText })
 

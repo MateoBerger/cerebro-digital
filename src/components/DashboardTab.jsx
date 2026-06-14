@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { subscribeVariables, seedVariables } from '../firebase/db'
+import { subscribeVariables, seedVariables, subscribeTareas, updateTarea } from '../firebase/db'
 
 function getVar(vars, key, fallback = null) {
   const v = vars.find(v => v.key === key)
@@ -14,28 +14,28 @@ const MODO_COLOR = {
 }
 
 export default function DashboardTab({ uid }) {
-  const [vars, setVars]    = useState([])
-  const [loading, setLoad] = useState(true)
+  const [vars,   setVars]   = useState([])
+  const [tareas, setTareas] = useState([])
+  const [loading, setLoad]  = useState(true)
 
   useEffect(() => {
     if (!uid) return
     seedVariables(uid)
-    const unsub = subscribeVariables(uid, data => {
-      setVars(data)
-      setLoad(false)
-    })
-    return unsub
+    const unsubVars   = subscribeVariables(uid, data => { setVars(data); setLoad(false) })
+    const unsubTareas = subscribeTareas(uid, setTareas)
+    return () => { unsubVars(); unsubTareas() }
   }, [uid])
 
-  const modo     = getVar(vars, 'modo_organizacion', 'estandar')
-  const racha    = getVar(vars, 'constancia_preu_racha', 0)
-  const horario  = getVar(vars, 'horario_base', {})
-  const metas    = getVar(vars, 'metas_semana_actual', {})
-  const bloque   = getVar(vars, 'tiempo_bloque_estudio', 120)
-  const descanso = getVar(vars, 'tiempo_descanso_largo', 25)
-  const micro    = getVar(vars, 'tiempo_micro_pausa', 65)
-  const metaBloq = getVar(vars, 'bloques_diarios_meta', 3)
-  const metaPaes = getVar(vars, 'puntaje_meta_paes', 900)
+  const modo      = getVar(vars, 'modo_organizacion', 'estandar')
+  const racha     = getVar(vars, 'constancia_preu_racha', 0)
+  const horario   = getVar(vars, 'horario_base', {})
+  const bloque    = getVar(vars, 'tiempo_bloque_estudio', 120)
+  const descanso  = getVar(vars, 'tiempo_descanso_largo', 25)
+  const micro     = getVar(vars, 'tiempo_micro_pausa', 65)
+  const metaBloq  = getVar(vars, 'bloques_diarios_meta', 3)
+  const metaPaes  = getVar(vars, 'puntaje_meta_paes', 900)
+
+  const tareasSemana = tareas.filter(t => (t.alcance || 'general') === 'semanal')
 
   const now      = new Date()
   const hour     = now.getHours()
@@ -70,7 +70,7 @@ export default function DashboardTab({ uid }) {
       {/* Main cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
         <HorarioCard  horario={horario} />
-        <MetasCard    metas={metas} />
+        <MetasCard    tareas={tareasSemana} uid={uid} />
         <PomodoroCard bloque={bloque} descanso={descanso} micro={micro} meta={metaBloq} />
       </div>
     </div>
@@ -130,24 +130,74 @@ function HorarioCard({ horario }) {
   )
 }
 
-function MetasCard({ metas }) {
-  const entries = Object.entries(metas || {})
+const PRIO_COLOR = { alta: '#f07272', media: '#f0a740', baja: '#625e7c' }
+
+function MetasCard({ tareas, uid }) {
+  const pendientes  = tareas.filter(t => !t.completada)
+  const completadas = tareas.filter(t => t.completada)
+
+  async function toggle(t) {
+    await updateTarea(uid, t.id, { completada: !t.completada })
+  }
+
   return (
     <div className="card">
-      <CardHeader title="Metas de la semana" />
-      {entries.length === 0
-        ? <EmptyState text="Sin metas esta semana" hint="Edítalas en Diccionario → metas_semana_actual" />
-        : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {entries.map(([k, v]) => (
-              <div key={k} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                <div style={{ width: '16px', height: '16px', borderRadius: '4px', border: '2px solid var(--border-hi)', flexShrink: 0, marginTop: '1px' }} />
-                <span style={{ fontSize: '13px', color: 'var(--text0)', lineHeight: 1.4 }}>{String(v)}</span>
-              </div>
-            ))}
-          </div>
-        )
-      }
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+        <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text0)', letterSpacing: '.1px' }}>Tareas de la semana</h2>
+        {tareas.length > 0 && (
+          <span style={{ fontSize: '11px', color: 'var(--text2)' }}>
+            {completadas.length}/{tareas.length}
+          </span>
+        )}
+      </div>
+
+      {tareas.length === 0 ? (
+        <EmptyState text="Sin tareas semanales" hint="Agregalas en Tareas → Semanales" />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {pendientes.map(t => (
+            <TareaRow key={t.id} tarea={t} onToggle={() => toggle(t)} />
+          ))}
+          {completadas.length > 0 && pendientes.length > 0 && (
+            <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />
+          )}
+          {completadas.map(t => (
+            <TareaRow key={t.id} tarea={t} onToggle={() => toggle(t)} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function TareaRow({ tarea, onToggle }) {
+  const done  = tarea.completada
+  const color = PRIO_COLOR[tarea.prioridad] || PRIO_COLOR.media
+  return (
+    <div style={{ display: 'flex', gap: '9px', alignItems: 'center' }}>
+      <button
+        onClick={onToggle}
+        style={{
+          width: '17px', height: '17px', borderRadius: '4px', flexShrink: 0,
+          border: `2px solid ${done ? 'var(--green)' : color}`,
+          background: done ? 'rgba(62,201,126,.14)' : 'none',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', transition: 'all .15s',
+        }}
+      >
+        {done && (
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 6L9 17l-5-5" />
+          </svg>
+        )}
+      </button>
+      <span style={{
+        fontSize: '13px', color: done ? 'var(--text2)' : 'var(--text0)',
+        textDecoration: done ? 'line-through' : 'none', lineHeight: 1.4,
+        opacity: done ? .6 : 1,
+      }}>
+        {tarea.titulo}
+      </span>
     </div>
   )
 }

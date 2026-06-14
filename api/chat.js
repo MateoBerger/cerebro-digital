@@ -120,10 +120,17 @@ function normalizeGroqResponse(data) {
 }
 
 function buildSystemPrompt(ctx) {
+  const DIAS = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']
+  const hoyDia    = typeof ctx.todayDia === 'number' ? ctx.todayDia : 0
+  const mañanaDia = (hoyDia + 1) % 7
+  const pasadoDia = (hoyDia + 2) % 7
+
   return `Sos el asistente personal de Mateo Berger, estudiante chileno de 4to medio que se prepara para la PAES 2026.
 Podés crear tareas y bloques de calendario. El registro de ensayos PAES lo maneja el asistente especializado de la sección PAES.
 
 Hoy es ${ctx.fecha}.
+En el sistema de calendario: hoy = dia ${hoyDia} (${DIAS[hoyDia]}), mañana = dia ${mañanaDia} (${DIAS[mañanaDia]}), pasado mañana = dia ${pasadoDia} (${DIAS[pasadoDia]}).
+Referencia completa: 0=Lunes 1=Martes 2=Miércoles 3=Jueves 4=Viernes 5=Sábado 6=Domingo.
 
 # DATOS DEL SISTEMA
 
@@ -204,7 +211,10 @@ export default async function handler(req, res) {
     })
 
     const data = await response.json()
-    if (!response.ok) return res.status(response.status).json(data)
+    if (!response.ok) {
+      const msg = data?.error?.message || (typeof data?.error === 'string' ? data.error : null) || JSON.stringify(data)
+      return res.status(response.status).json({ error: msg })
+    }
     res.json(normalizeGroqResponse(data))
   } catch (err) {
     res.status(500).json({ error: err.message })

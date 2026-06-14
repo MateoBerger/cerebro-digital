@@ -61,7 +61,12 @@ export default function Sidebar({ collapsed, onToggle, activeTab, onTabChange, u
   return (
     <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
       <div className="sidebar-logo">
-        <div className="logo-mark">SG</div>
+        <img
+          src="/logo.png"
+          alt="SMGV"
+          className="logo-mark"
+          style={{ objectFit: 'contain', background: 'none' }}
+        />
         <span className="logo-text">SMGV</span>
       </div>
 

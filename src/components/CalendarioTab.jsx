@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { subscribeBloques, addBloque, updateBloque, deleteBloque } from '../firebase/db'
+import { subscribeBloques, addBloque, updateBloque, deleteBloque, subscribeGymStats, markGymSession } from '../firebase/db'
 
 // ── Constantes ─────────────────────────────────────────────────────────────────
 
@@ -67,18 +67,28 @@ function minToTime(min) {
 // ── Componente principal ───────────────────────────────────────────────────────
 
 export default function CalendarioTab({ uid }) {
-  const [bloques, setBloques]    = useState([])
-  const [loading, setLoading]    = useState(true)
-  const [weekOffset, setWeekOff] = useState(0)
-  const [form, setForm]          = useState(null)
-  const [saving, setSaving]      = useState(false)
-  const scrollRef                = useRef(null)
+  const [bloques,   setBloques]   = useState([])
+  const [loading,   setLoading]   = useState(true)
+  const [weekOffset, setWeekOff]  = useState(0)
+  const [form,      setForm]      = useState(null)
+  const [saving,    setSaving]    = useState(false)
+  const [gymStats,  setGymStats]  = useState({ streak: 0, lastGymDate: null, totalSessions: 0 })
+  const [gymSaving, setGymSaving] = useState(false)
+  const scrollRef                 = useRef(null)
 
   useEffect(() => {
     if (!uid) return
-    const unsub = subscribeBloques(uid, data => { setBloques(data); setLoading(false) })
-    return unsub
+    const unsubBloques = subscribeBloques(uid, data => { setBloques(data); setLoading(false) })
+    const unsubGym     = subscribeGymStats(uid, setGymStats)
+    return () => { unsubBloques(); unsubGym() }
   }, [uid])
+
+  async function handleMarkGym() {
+    if (gymSaving || gymStats.lastGymDate === todayStr()) return
+    setGymSaving(true)
+    await markGymSession(uid, gymStats)
+    setGymSaving(false)
+  }
 
   // Auto-scroll a la hora actual al cargar
   useEffect(() => {
@@ -185,23 +195,29 @@ export default function CalendarioTab({ uid }) {
               {weekStart} — {weekEnd}
             </p>
           </div>
-          <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
-            <NavBtn onClick={() => setWeekOff(w => w - 1)} title="Semana anterior">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
-            </NavBtn>
-            {weekOffset !== 0 && (
-              <button onClick={() => setWeekOff(0)} style={{
-                padding:'5px 12px', borderRadius:'7px', border:'1px solid var(--border)',
-                background:'none', color:'var(--text1)', fontSize:'12px', fontWeight:500,
-                fontFamily:'Inter, sans-serif', cursor:'pointer', transition:'all .12s',
-              }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor='var(--border-hi)'; e.currentTarget.style.color='var(--text0)' }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.color='var(--text1)' }}
-              >Hoy</button>
-            )}
-            <NavBtn onClick={() => setWeekOff(w => w + 1)} title="Semana siguiente">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
-            </NavBtn>
+          <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
+            {/* Gym streak widget */}
+            <GymWidget gymStats={gymStats} saving={gymSaving} onMark={handleMarkGym} />
+
+            {/* Navegación semanas */}
+            <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+              <NavBtn onClick={() => setWeekOff(w => w - 1)} title="Semana anterior">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+              </NavBtn>
+              {weekOffset !== 0 && (
+                <button onClick={() => setWeekOff(0)} style={{
+                  padding:'5px 12px', borderRadius:'7px', border:'1px solid var(--border)',
+                  background:'none', color:'var(--text1)', fontSize:'12px', fontWeight:500,
+                  fontFamily:'Inter, sans-serif', cursor:'pointer', transition:'all .12s',
+                }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor='var(--border-hi)'; e.currentTarget.style.color='var(--text0)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.color='var(--text1)' }}
+                >Hoy</button>
+              )}
+              <NavBtn onClick={() => setWeekOff(w => w + 1)} title="Semana siguiente">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
+              </NavBtn>
+            </div>
           </div>
         </div>
       </div>
@@ -327,6 +343,65 @@ export default function CalendarioTab({ uid }) {
         saving={saving}
         weekKey={weekKey}
       />
+    </div>
+  )
+}
+
+// ── Widget de racha de gym ─────────────────────────────────────────────────────
+
+function GymWidget({ gymStats, saving, onMark }) {
+  const marcadoHoy = gymStats.lastGymDate === todayStr()
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '8px',
+      padding: '5px 10px', borderRadius: '8px',
+      border: `1px solid ${marcadoHoy ? 'rgba(240,167,64,.35)' : 'var(--border)'}`,
+      background: marcadoHoy ? 'rgba(240,167,64,.08)' : 'var(--bg2)',
+    }}>
+      <span style={{ fontSize: '14px' }}>🏋️</span>
+      <div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '3px' }}>
+          <span style={{
+            fontFamily: "'IBM Plex Mono', monospace", fontSize: '15px', fontWeight: 700,
+            color: 'var(--amber)', lineHeight: 1,
+          }}>
+            {gymStats.streak}
+          </span>
+          <span style={{ fontSize: '10px', color: 'var(--text2)' }}>días</span>
+        </div>
+        <div style={{ fontSize: '9px', color: 'var(--text2)', lineHeight: 1, marginTop: '1px' }}>
+          Racha gym
+        </div>
+      </div>
+      {!marcadoHoy && (
+        <button
+          onClick={onMark}
+          disabled={saving}
+          title="Marcar sesión de hoy"
+          style={{
+            padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--amber)',
+            background: 'rgba(240,167,64,.12)', color: 'var(--amber)',
+            fontSize: '11px', fontWeight: 600, fontFamily: 'Inter, sans-serif',
+            cursor: saving ? 'wait' : 'pointer', opacity: saving ? .7 : 1,
+            transition: 'background .12s',
+          }}
+          onMouseEnter={e => { if (!saving) e.currentTarget.style.background = 'rgba(240,167,64,.22)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(240,167,64,.12)' }}
+        >
+          + Sesión
+        </button>
+      )}
+      {marcadoHoy && (
+        <span style={{
+          fontSize: '11px', color: 'var(--amber)', fontWeight: 600,
+          display: 'flex', alignItems: 'center', gap: '3px',
+        }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 6L9 17l-5-5" />
+          </svg>
+          Hoy ✓
+        </span>
+      )}
     </div>
   )
 }

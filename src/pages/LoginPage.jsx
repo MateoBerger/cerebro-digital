@@ -48,23 +48,18 @@ export default function LoginPage() {
         flexDirection: 'column',
         alignItems: 'center',
       }}>
-        {/* Logo mark */}
-        <div style={{
-          width: '54px',
-          height: '54px',
-          borderRadius: '15px',
-          background: 'var(--accent)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '15px',
-          fontWeight: 800,
-          letterSpacing: '.5px',
-          color: '#fff',
-          marginBottom: '20px',
-        }}>
-          SG
-        </div>
+        {/* Logo */}
+        <img
+          src="/logo.png"
+          alt="SMGV"
+          style={{
+            width: '72px',
+            height: '72px',
+            borderRadius: '16px',
+            objectFit: 'contain',
+            marginBottom: '20px',
+          }}
+        />
 
         <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text0)', letterSpacing: '.2px', marginBottom: '5px', textAlign: 'center' }}>
           SMGV

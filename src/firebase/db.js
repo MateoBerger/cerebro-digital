@@ -237,6 +237,38 @@ export async function deletePaesError(uid, id) {
   await deleteDoc(doc(db, 'users', uid, 'paes-errors', id))
 }
 
+// ── GYM STREAK ────────────────────────────────────────────
+// users/{uid}/gym-data/stats
+
+function gymLocalDate() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+
+export function subscribeGymStats(uid, callback) {
+  return onSnapshot(doc(db, 'users', uid, 'gym-data', 'stats'), snap => {
+    callback(snap.exists() ? snap.data() : { streak: 0, lastGymDate: null, totalSessions: 0 })
+  })
+}
+
+export async function markGymSession(uid, currentStats) {
+  const today = gymLocalDate()
+  if (currentStats?.lastGymDate === today) return
+
+  const d = new Date()
+  d.setDate(d.getDate() - 1)
+  const yesterday = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+
+  const prevStreak = currentStats?.streak || 0
+  const newStreak  = currentStats?.lastGymDate === yesterday ? prevStreak + 1 : 1
+
+  await setDoc(doc(db, 'users', uid, 'gym-data', 'stats'), {
+    streak:        newStreak,
+    lastGymDate:   today,
+    totalSessions: (currentStats?.totalSessions || 0) + 1,
+  }, { merge: true })
+}
+
 // ── PAES v2 — EJERCICIOS (generados por IA) ───────────────
 // users/{uid}/paes-ejercicios (collection)
 

@@ -40,7 +40,6 @@ function sliderColor(v) {
 }
 
 export default function InicioTab({ uid }) {
-  const [guiaOpen, setGuiaOpen] = useState(false)
   const [fields, setFields]     = useState(DEFAULT_VALUES)
   const [saved, setSaved]       = useState(undefined) // undefined=cargando, null=no hay, obj=existe
   const [editing, setEditing]   = useState(false)
@@ -74,7 +73,18 @@ export default function InicioTab({ uid }) {
   const showForm = saved === null || editing
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '32px 36px' }}>
+    <div style={{
+      flex: 1, overflowY: 'auto', position: 'relative',
+      backgroundImage: 'url(/fondo-inicio.png)',
+      backgroundSize: 'cover', backgroundPosition: 'center top',
+    }}>
+      {/* Overlay adaptado al tema */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'var(--inicio-overlay)',
+        pointerEvents: 'none', zIndex: 0,
+      }} />
+      <div style={{ position: 'relative', zIndex: 1, padding: '32px 36px' }}>
       <div style={{ maxWidth: '680px' }}>
 
         {/* Header */}
@@ -85,43 +95,24 @@ export default function InicioTab({ uid }) {
           <p style={{ color: 'var(--text1)', fontSize: '14px' }}>Sistema Maestro de Gestión de Vida</p>
         </div>
 
-        {/* Guía colapsable */}
+        {/* Descripción estática */}
         <div className="card" style={{ marginBottom: '20px' }}>
-          <button
-            onClick={() => setGuiaOpen(o => !o)}
-            style={{
-              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-              fontFamily: 'Inter, sans-serif', fontSize: '13px', fontWeight: 600, color: 'var(--text0)',
-            }}
-          >
-            <span>¿Qué es SMGV?</span>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-              style={{ color: 'var(--text2)', transform: guiaOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s ease', flexShrink: 0 }}>
-              <path d="M6 9l6 6 6-6" />
-            </svg>
-          </button>
-
-          {guiaOpen && (
-            <div style={{ marginTop: '16px', borderTop: '1px solid var(--border)', paddingTop: '16px', animation: 'fadeIn .15s ease' }}>
-              <p style={{ fontSize: '13px', color: 'var(--text1)', lineHeight: 1.75, marginBottom: '18px' }}>
-                SMGV es tu sistema personal para organizarte como estudiante de 4to medio. Centraliza
-                tu horario, metas, plan de estudio PAES y seguimiento diario en un solo lugar.
-                Más adelante, un asistente de IA podrá leer todo esto y ayudarte a decidir qué hacer.
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
-                {SECCIONES.map(s => (
-                  <div key={s.nombre} style={{ display: 'flex', gap: '12px', alignItems: 'baseline' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', minWidth: '128px', flexShrink: 0 }}>
-                      {s.nombre}
-                    </span>
-                    <span style={{ fontSize: '12px', color: 'var(--text1)', lineHeight: 1.5 }}>{s.desc}</span>
-                  </div>
-                ))}
+          <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text0)', marginBottom: '12px' }}>¿Qué es SMGV?</h2>
+          <p style={{ fontSize: '13px', color: 'var(--text1)', lineHeight: 1.75, marginBottom: '18px' }}>
+            Tu sistema personal para organizarte como estudiante de 4to medio. Centraliza
+            tu horario, metas, plan de estudio PAES y seguimiento diario en un solo lugar.
+            El asistente IA puede leer todo esto y ayudarte a decidir qué hacer.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
+            {SECCIONES.map(s => (
+              <div key={s.nombre} style={{ display: 'flex', gap: '12px', alignItems: 'baseline' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', minWidth: '128px', flexShrink: 0 }}>
+                  {s.nombre}
+                </span>
+                <span style={{ fontSize: '12px', color: 'var(--text1)', lineHeight: 1.5 }}>{s.desc}</span>
               </div>
-            </div>
-          )}
+            ))}
+          </div>
         </div>
 
         {/* Check-in diario */}
@@ -153,6 +144,7 @@ export default function InicioTab({ uid }) {
           )}
         </div>
 
+      </div>
       </div>
     </div>
   )
