@@ -4,6 +4,7 @@ import {
   subscribeBloques, addBloque,
   subscribePaesStats,
   subscribeCheckin,
+  subscribeDailyGoalsConfig, subscribeDailyGoalsState, addDailyGoalItem,
 } from '../firebase/db'
 
 function chileNow() {
@@ -31,6 +32,7 @@ function toolLabel(name) {
     add_tarea:             'Creando tarea…',
     complete_tarea:        'Actualizando tarea…',
     add_bloque_calendario: 'Agregando bloque al calendario…',
+    add_meta_diaria:       'Agregando meta diaria…',
   }
   return labels[name] || 'Ejecutando acción…'
 }
@@ -40,6 +42,8 @@ export function useChat(uid) {
   const [bloques,    setBloques]    = useState([])
   const [paesStats,  setPaesStats]  = useState(null)
   const [checkinHoy, setCheckinHoy] = useState(null)
+  const [goalItems,  setGoalItems]  = useState([])
+  const [goalState,  setGoalState]  = useState({})
 
   const [uiMessages, setUiMessages] = useState(() => {
     const h = new Date().getHours()
@@ -63,6 +67,8 @@ export function useChat(uid) {
       subscribeBloques(uid,  setBloques),
       subscribePaesStats(uid, setPaesStats),
       subscribeCheckin(uid,  today, setCheckinHoy),
+      subscribeDailyGoalsConfig(uid, setGoalItems),
+      subscribeDailyGoalsState(uid, today, setGoalState),
     ]
     return () => unsubs.forEach(u => u())
   }, [uid])
@@ -100,7 +106,11 @@ export function useChat(uid) {
       ? `Racha: ${paesStats.streak || 0} días | Correctas: ${paesStats.correctAnswers || 0}/${paesStats.totalAnswers || 0} | Ensayos registrados: ${paesStats.essaysCount || 0}`
       : 'Sin datos PAES aún (usar sección PAES para registrar ensayos)'
 
-    return { fecha, todayDia, checkin, tareas: tareasStr, calendario: calStr, paes: paesStr }
+    const metasDiariasStr = goalItems.length
+      ? goalItems.map(g => `${goalState[g.id] ? '[x]' : '[ ]'} ${g.label}`).join('\n')
+      : 'Sin metas diarias configuradas'
+
+    return { fecha, todayDia, checkin, tareas: tareasStr, calendario: calStr, paes: paesStr, metas_diarias: metasDiariasStr }
   }
 
   async function executeTool(name, toolInput) {
@@ -116,6 +126,10 @@ export function useChat(uid) {
       case 'add_bloque_calendario':
         await addBloque(uid, { ...toolInput, semana: toolInput.recurrente ? null : getWeekKey() })
         return `Bloque "${toolInput.titulo}" agregado al calendario`
+
+      case 'add_meta_diaria':
+        await addDailyGoalItem(uid, toolInput.label)
+        return `Meta diaria "${toolInput.label}" agregada`
 
       default:
         return 'Herramienta no reconocida'

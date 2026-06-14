@@ -56,6 +56,20 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'add_meta_diaria',
+      description: 'Agrega un nuevo ítem a la lista de metas diarias básicas de Mateo',
+      parameters: {
+        type: 'object',
+        properties: {
+          label: { type: 'string', description: 'Nombre corto del ítem (ej: "Meditar 5 min", "Leer 30 min")' },
+        },
+        required: ['label'],
+      },
+    },
+  },
 ]
 
 // ── Conversión formato normalizado → Groq ──────────────────────
@@ -145,6 +159,9 @@ ${ctx.calendario}
 
 ## Estado PAES (resumen)
 ${ctx.paes}
+
+## Metas diarias básicas (hoy)
+${ctx.metas_diarias || 'Sin metas diarias'}
 
 # CÓMO ACTUAR
 - Español rioplatense (vos, tenés, hacés, etc.)

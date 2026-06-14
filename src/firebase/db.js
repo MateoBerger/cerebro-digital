@@ -1,6 +1,7 @@
 import {
   collection, doc, getDocs, setDoc, updateDoc,
   deleteDoc, onSnapshot, serverTimestamp, writeBatch, addDoc, query, orderBy, limit,
+  arrayUnion,
 } from 'firebase/firestore'
 import { db } from './config'
 import { DEFAULT_VARIABLES, DEFAULT_DIAGRAM } from './defaults'
@@ -284,4 +285,52 @@ export async function addPaesEjercicio(uid, ejercicio) {
     ...ejercicio,
     generadoEn: serverTimestamp(),
   })
+}
+
+// ── METAS DIARIAS ─────────────────────────────────────────
+// users/{uid}/settings/daily-goals → { items: [{id, label}] }
+// users/{uid}/daily-goals/{YYYY-MM-DD} → { [itemId]: boolean }
+
+const DEFAULT_DAILY_GOALS_ITEMS = [
+  { id: 'item_mercurio', label: 'Leer Mercurio' },
+  { id: 'item_leer',     label: 'Leer 15 min' },
+  { id: 'item_creatina', label: 'Tomar creatina' },
+  { id: 'item_gym',      label: 'Ir al gym' },
+  { id: 'item_estudio',  label: 'Bloque de estudio completado' },
+  { id: 'item_preu',     label: 'Fui al preu' },
+]
+
+export function subscribeDailyGoalsConfig(uid, callback) {
+  const ref = doc(db, 'users', uid, 'settings', 'daily-goals')
+  let seeded = false
+  return onSnapshot(ref, snap => {
+    if (snap.exists()) {
+      callback(snap.data().items || DEFAULT_DAILY_GOALS_ITEMS)
+    } else if (!seeded) {
+      seeded = true
+      setDoc(ref, { items: DEFAULT_DAILY_GOALS_ITEMS })
+      callback(DEFAULT_DAILY_GOALS_ITEMS)
+    }
+  })
+}
+
+export function subscribeDailyGoalsState(uid, date, callback) {
+  return onSnapshot(doc(db, 'users', uid, 'daily-goals', date), snap => {
+    callback(snap.exists() ? snap.data() : {})
+  })
+}
+
+export async function toggleDailyGoal(uid, date, itemId, checked) {
+  await setDoc(
+    doc(db, 'users', uid, 'daily-goals', date),
+    { [itemId]: checked },
+    { merge: true },
+  )
+}
+
+export async function addDailyGoalItem(uid, label) {
+  const id  = 'item_' + Date.now()
+  const ref = doc(db, 'users', uid, 'settings', 'daily-goals')
+  await setDoc(ref, { items: arrayUnion({ id, label }) }, { merge: true })
+  return id
 }

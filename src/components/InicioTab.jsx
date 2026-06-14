@@ -1,12 +1,17 @@
 import React, { useEffect, useState } from 'react'
 import { saveCheckin, subscribeCheckin } from '../firebase/db'
 
+function chileDate() {
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))
+}
+
 function getLocalDate() {
-  const d = new Date()
+  const d = chileDate()
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
-const TODAY = getLocalDate()
+const TODAY     = getLocalDate()
+const IS_SUNDAY = chileDate().getDay() === 0
 
 const SECCIONES = [
   { nombre: 'Inicio',           desc: 'Esta pantalla. Check-in diario y guía de la app.' },
@@ -95,6 +100,9 @@ export default function InicioTab({ uid }) {
           <p style={{ color: 'var(--text1)', fontSize: '14px' }}>Sistema Maestro de Gestión de Vida</p>
         </div>
 
+        {/* Check semanal — solo domingos */}
+        {IS_SUNDAY && <CheckSemanalBanner />}
+
         {/* Descripción estática */}
         <div className="card" style={{ marginBottom: '20px' }}>
           <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text0)', marginBottom: '12px' }}>¿Qué es SMGV?</h2>
@@ -145,6 +153,29 @@ export default function InicioTab({ uid }) {
         </div>
 
       </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Banner check semanal (solo domingos) ── */
+function CheckSemanalBanner() {
+  return (
+    <div className="card" style={{
+      marginBottom: '20px',
+      border: '1px solid rgba(240,167,64,.35)',
+      background: 'rgba(240,167,64,.07)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <span style={{ fontSize: '22px', flexShrink: 0 }}>📋</span>
+        <div>
+          <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--amber)', marginBottom: '3px' }}>
+            Heyy, toca el check de la semana
+          </div>
+          <div style={{ fontSize: '12px', color: 'var(--text1)', lineHeight: 1.5 }}>
+            Revisá tus metas antes de que empiece la semana nueva.
+          </div>
+        </div>
       </div>
     </div>
   )

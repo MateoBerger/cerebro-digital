@@ -1,5 +1,15 @@
 import React, { useEffect, useState } from 'react'
-import { subscribeVariables, seedVariables, subscribeTareas, updateTarea } from '../firebase/db'
+import {
+  subscribeVariables, seedVariables, subscribeTareas, updateTarea,
+  subscribeDailyGoalsConfig, subscribeDailyGoalsState, toggleDailyGoal,
+} from '../firebase/db'
+
+function chileToday() {
+  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+
+const TODAY = chileToday()
 
 function getVar(vars, key, fallback = null) {
   const v = vars.find(v => v.key === key)
@@ -14,16 +24,22 @@ const MODO_COLOR = {
 }
 
 export default function DashboardTab({ uid }) {
-  const [vars,   setVars]   = useState([])
-  const [tareas, setTareas] = useState([])
-  const [loading, setLoad]  = useState(true)
+  const [vars,      setVars]      = useState([])
+  const [tareas,    setTareas]    = useState([])
+  const [goalItems, setGoalItems] = useState([])
+  const [goalState, setGoalState] = useState({})
+  const [loading,   setLoad]      = useState(true)
 
   useEffect(() => {
     if (!uid) return
     seedVariables(uid)
-    const unsubVars   = subscribeVariables(uid, data => { setVars(data); setLoad(false) })
-    const unsubTareas = subscribeTareas(uid, setTareas)
-    return () => { unsubVars(); unsubTareas() }
+    const unsubs = [
+      subscribeVariables(uid, data => { setVars(data); setLoad(false) }),
+      subscribeTareas(uid, setTareas),
+      subscribeDailyGoalsConfig(uid, setGoalItems),
+      subscribeDailyGoalsState(uid, TODAY, setGoalState),
+    ]
+    return () => unsubs.forEach(u => u())
   }, [uid])
 
   const modo      = getVar(vars, 'modo_organizacion', 'estandar')
@@ -69,10 +85,69 @@ export default function DashboardTab({ uid }) {
 
       {/* Main cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
-        <HorarioCard  horario={horario} />
-        <MetasCard    tareas={tareasSemana} uid={uid} />
-        <PomodoroCard bloque={bloque} descanso={descanso} micro={micro} meta={metaBloq} />
+        <MetasDiariasCard items={goalItems} state={goalState} uid={uid} />
+        <HorarioCard      horario={horario} />
+        <MetasCard        tareas={tareasSemana} uid={uid} />
+        <PomodoroCard     bloque={bloque} descanso={descanso} micro={micro} meta={metaBloq} />
       </div>
+    </div>
+  )
+}
+
+function MetasDiariasCard({ items, state, uid }) {
+  const checked = items.filter(i => state[i.id]).length
+  const allDone = items.length > 0 && checked === items.length
+
+  async function handleToggle(item) {
+    await toggleDailyGoal(uid, TODAY, item.id, !state[item.id])
+  }
+
+  return (
+    <div className="card">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+        <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text0)', letterSpacing: '.1px' }}>Metas diarias</h2>
+        {items.length > 0 && (
+          <span style={{ fontSize: '11px', color: allDone ? 'var(--green)' : 'var(--text2)', fontWeight: allDone ? 600 : 400 }}>
+            {checked}/{items.length}
+          </span>
+        )}
+      </div>
+      {items.length === 0 ? (
+        <EmptyState text="Sin metas diarias" hint="Pedile al asistente que agregue una" />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {items.map(item => {
+            const done = !!state[item.id]
+            return (
+              <div key={item.id} style={{ display: 'flex', gap: '9px', alignItems: 'center' }}>
+                <button
+                  onClick={() => handleToggle(item)}
+                  style={{
+                    width: '17px', height: '17px', borderRadius: '4px', flexShrink: 0,
+                    border: `2px solid ${done ? 'var(--green)' : 'var(--border-hi, #444)'}`,
+                    background: done ? 'rgba(62,201,126,.14)' : 'none',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', transition: 'all .15s',
+                  }}
+                >
+                  {done && (
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                  )}
+                </button>
+                <span style={{
+                  fontSize: '13px', color: done ? 'var(--text2)' : 'var(--text0)',
+                  textDecoration: done ? 'line-through' : 'none',
+                  opacity: done ? .6 : 1, lineHeight: 1.4, transition: 'all .2s',
+                }}>
+                  {item.label}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
