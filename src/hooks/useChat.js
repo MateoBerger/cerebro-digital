@@ -122,6 +122,21 @@ export function useChat(uid) {
     }
   }
 
+  async function parseResponse(res) {
+    const text = await res.text()
+    if (!text) throw new Error(`Respuesta vacía del servidor (HTTP ${res.status})`)
+    try {
+      return JSON.parse(text)
+    } catch {
+      throw new Error(`El servidor devolvió una respuesta inesperada (HTTP ${res.status}): ${text.slice(0, 200)}`)
+    }
+  }
+
+  function checkError(d) {
+    if (!d.error) return
+    throw new Error(typeof d.error === 'string' ? d.error : d.error?.message || JSON.stringify(d.error))
+  }
+
   function pushUi(msg) {
     setUiMessages(m => [...m, msg])
   }
@@ -148,8 +163,8 @@ export function useChat(uid) {
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ messages: newApiMsgs, context }),
       })
-      const d1 = await r1.json()
-      if (d1.error) throw new Error(typeof d1.error === 'string' ? d1.error : d1.error?.message || JSON.stringify(d1.error))
+      const d1 = await parseResponse(r1)
+      checkError(d1)
 
       if (d1.stop_reason === 'tool_use') {
         const textBefore = d1.content.find(b => b.type === 'text')?.text
@@ -176,8 +191,8 @@ export function useChat(uid) {
             tool_results:      toolResults,
           }),
         })
-        const d2 = await r2.json()
-        if (d2.error) throw new Error(typeof d2.error === 'string' ? d2.error : d2.error?.message || JSON.stringify(d2.error))
+        const d2 = await parseResponse(r2)
+        checkError(d2)
         const finalText = d2.content?.find(b => b.type === 'text')?.text || ''
         if (finalText) pushUi({ id: `a2-${Date.now()}`, role: 'assistant', text: finalText })
 
