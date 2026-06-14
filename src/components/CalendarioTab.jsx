@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { subscribeGymStats, markGymSession, getBloquesOnce, markBloquesMigrated } from '../firebase/db'
 import { gcalListarEventos, gcalCrearEvento, gcalActualizarEvento, gcalEliminarEvento, gcalEventToBloque } from '../utils/gcalApi'
+import { startCalendarAuthRedirect } from '../hooks/useGCalToken'
 
 // ── Constantes ─────────────────────────────────────────────────────────────────
 
@@ -62,7 +63,7 @@ function minToTime(min) {
 
 // ── Componente principal ───────────────────────────────────────────────────────
 
-export default function CalendarioTab({ uid, gcalToken, onRefreshGcalToken }) {
+export default function CalendarioTab({ uid, gcalToken }) {
   const [bloques,      setBloques]      = useState([])
   const [loading,      setLoading]      = useState(false)
   const [apiError,     setApiError]     = useState(null)
@@ -227,9 +228,9 @@ export default function CalendarioTab({ uid, gcalToken, onRefreshGcalToken }) {
     }
   }
 
-  async function handleReconnect() {
-    const newToken = await onRefreshGcalToken?.()
-    if (newToken) setTokenExpired(false)
+  function handleReconnect() {
+    startCalendarAuthRedirect()
+    // La pagina navega a Google; al volver, App.jsx captura el token via getRedirectResult
   }
 
   const weekStart = weekDays[0].toLocaleDateString('es-CL', { day: 'numeric', month: 'long' })
