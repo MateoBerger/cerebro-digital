@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from './firebase/config'
+import { useGCalToken } from './hooks/useGCalToken'
 import LoginPage    from './pages/LoginPage'
 import Sidebar      from './components/Sidebar'
 import InicioTab    from './components/InicioTab'
@@ -29,6 +30,7 @@ export default function App() {
   const [sidebarOpen, setSidebar] = useState(true)
   const [theme, setTheme]         = useState(() => localStorage.getItem('cd-theme') || 'dark')
   const [info, setInfo]           = useState('')
+  const { token: gcalToken, refreshToken: refreshGcalToken } = useGCalToken()
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -64,12 +66,12 @@ export default function App() {
         onThemeToggle={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
       />
       <div className="app-content">
-        {tab === 'inicio'     && <InicioTab    uid={user.uid} />}
+        {tab === 'inicio'     && <InicioTab    uid={user.uid} gcalToken={gcalToken} />}
         {tab === 'dashboard'  && <DashboardTab uid={user.uid} onInfo={setInfo} />}
         {tab === 'diagram'    && <DiagramTab   uid={user.uid} onInfo={setInfo} />}
         {tab === 'dict'       && <DictTab      uid={user.uid} onInfo={setInfo} />}
         {tab === 'tareas'     && <TareasTab uid={user.uid} />}
-        {tab === 'calendario' && <CalendarioTab uid={user.uid} />}
+        {tab === 'calendario' && <CalendarioTab uid={user.uid} gcalToken={gcalToken} onRefreshGcalToken={refreshGcalToken} />}
         {tab === 'paes'       && <PAESTab uid={user.uid} />}
         {tab === 'asistente'  && <AsistenteTab uid={user.uid} />}
       </div>

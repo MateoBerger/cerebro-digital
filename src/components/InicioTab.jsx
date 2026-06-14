@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { saveCheckin, subscribeCheckin } from '../firebase/db'
+import { gcalListarEventos } from '../utils/gcalApi'
 
 function chileDate() {
   return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))
@@ -44,11 +45,33 @@ function sliderColor(v) {
   return 'var(--green)'
 }
 
-export default function InicioTab({ uid }) {
+export default function InicioTab({ uid, gcalToken }) {
   const [fields, setFields]     = useState(DEFAULT_VALUES)
   const [saved, setSaved]       = useState(undefined) // undefined=cargando, null=no hay, obj=existe
   const [editing, setEditing]   = useState(false)
   const [saving, setSaving]     = useState(false)
+  const [eventosHoy, setEvHoy]  = useState(null)   // null=no cargado, []=sin eventos
+
+  // Cargar eventos de Google Calendar para hoy
+  useEffect(() => {
+    if (!gcalToken) return
+    const start = new Date(); start.setHours(0, 0, 0, 0)
+    const end   = new Date(); end.setHours(23, 59, 59, 999)
+    gcalListarEventos(gcalToken, start, end)
+      .then(items => {
+        const ev = items
+          .filter(e => e.start?.dateTime)
+          .map(e => ({
+            id:         e.id,
+            titulo:     e.summary || '(sin título)',
+            horaInicio: new Date(e.start.dateTime).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }),
+            horaFin:    new Date(e.end.dateTime).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }),
+            tipo:       e.extendedProperties?.private?.tipo || 'otro',
+          }))
+        setEvHoy(ev)
+      })
+      .catch(() => setEvHoy([]))
+  }, [gcalToken])
 
   useEffect(() => {
     if (!uid) return
@@ -102,6 +125,9 @@ export default function InicioTab({ uid }) {
 
         {/* Check semanal — solo domingos */}
         {IS_SUNDAY && <CheckSemanalBanner />}
+
+        {/* Calendario del día */}
+        {eventosHoy !== null && <CalendarioDia eventos={eventosHoy} />}
 
         {/* Descripción estática */}
         <div className="card" style={{ marginBottom: '20px' }}>
@@ -309,6 +335,64 @@ function CheckinForm({ fields, onField, onSave, saving, isEdit, onCancel }) {
           {saving ? 'Guardando...' : isEdit ? 'Actualizar' : 'Guardar check-in'}
         </button>
       </div>
+    </div>
+  )
+}
+
+/* ── Calendario del día ── */
+const TIPO_COLOR = {
+  clase:     '#5b9cf6', estudio: '#c084fc', paes: '#3ec97e',
+  libre:     '#9e99ba', ejercicio: '#f0a740', otro: '#625e7c',
+}
+
+function CalendarioDia({ eventos }) {
+  const dateStr = new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })
+
+  return (
+    <div className="card" style={{ marginBottom: '20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2"/>
+          <path d="M16 2v4M8 2v4M3 10h18"/>
+        </svg>
+        <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text0)' }}>Hoy en tu calendario</h2>
+        <span style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--text2)', textTransform: 'capitalize' }}>
+          {dateStr}
+        </span>
+      </div>
+
+      {eventos.length === 0 ? (
+        <p style={{ fontSize: '13px', color: 'var(--text2)', textAlign: 'center', padding: '10px 0' }}>
+          Sin eventos programados para hoy
+        </p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {eventos.map(ev => {
+            const color = TIPO_COLOR[ev.tipo] || TIPO_COLOR.otro
+            return (
+              <div key={ev.id} style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '7px 10px', borderRadius: '7px',
+                background: 'var(--bg2)', border: '1px solid var(--border)',
+                borderLeft: `3px solid ${color}`,
+              }}>
+                <span style={{
+                  fontSize: '11px', fontFamily: "'IBM Plex Mono', monospace",
+                  color: 'var(--text2)', whiteSpace: 'nowrap', minWidth: '90px',
+                }}>
+                  {ev.horaInicio} – {ev.horaFin}
+                </span>
+                <span style={{
+                  fontSize: '13px', fontWeight: 500, color: 'var(--text0)',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {ev.titulo}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

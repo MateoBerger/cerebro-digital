@@ -115,6 +115,25 @@ export function subscribeBloques(uid, callback) {
   })
 }
 
+export async function getBloquesOnce(uid) {
+  const ref  = collection(db, 'users', uid, 'bloques')
+  const snap = await getDocs(ref)
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+}
+
+export async function markBloquesMigrated(uid) {
+  const ref  = collection(db, 'users', uid, 'bloques')
+  const snap = await getDocs(ref)
+  if (snap.empty) return
+  const batch = writeBatch(db)
+  snap.docs.forEach(d => {
+    if (!d.data()._migrated) {
+      batch.update(d.ref, { _migrated: true, _migratedAt: serverTimestamp() })
+    }
+  })
+  await batch.commit()
+}
+
 export async function addBloque(uid, bloque) {
   const ref = collection(db, 'users', uid, 'bloques')
   const id  = 'bloque_' + Date.now()

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { signInWithPopup } from 'firebase/auth'
 import { auth, googleProvider } from '../firebase/config'
+import { saveGCalToken } from '../hooks/useGCalToken'
 
 function GoogleLogo() {
   return (
@@ -21,7 +22,9 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
     try {
-      await signInWithPopup(auth, googleProvider)
+      const result = await signInWithPopup(auth, googleProvider)
+      const at = result.credential?.accessToken
+      if (at) saveGCalToken(at)
     } catch {
       setError('No se pudo iniciar sesión. Intenta de nuevo.')
       setLoading(false)
