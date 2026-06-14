@@ -21,21 +21,20 @@ export function saveGCalToken(accessToken) {
  * Evita COOP/CORS: GIS maneja su propio popup sin depender de Firebase.
  * onToken(accessToken) se llama al completar con exito.
  */
+const GCAL_CLIENT_ID =
+  import.meta.env.VITE_GCAL_CLIENT_ID ||
+  '110455411680-knlcvcneqpk25bfjo25ogcjkur93mu2n.apps.googleusercontent.com'
+
 export function requestCalendarAccess(onToken) {
-  const clientId = import.meta.env.VITE_GCAL_CLIENT_ID
   const gis = window.google?.accounts?.oauth2
 
-  if (!clientId) {
-    console.error('[GCal] VITE_GCAL_CLIENT_ID no esta configurado')
-    return
-  }
   if (!gis) {
     console.error('[GCal] Script de GIS aun no cargado (accounts.google.com/gsi/client)')
     return
   }
 
   const client = gis.initTokenClient({
-    client_id: clientId,
+    client_id: GCAL_CLIENT_ID,
     scope: 'https://www.googleapis.com/auth/calendar',
     callback: (resp) => {
       if (resp.error || !resp.access_token) {
