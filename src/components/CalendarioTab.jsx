@@ -63,12 +63,11 @@ function minToTime(min) {
 
 // ── Componente principal ───────────────────────────────────────────────────────
 
-export default function CalendarioTab({ uid, gcalToken, onGcalToken }) {
-  const [bloques,      setBloques]      = useState([])
-  const [loading,      setLoading]      = useState(false)
-  const [apiError,     setApiError]     = useState(null)
-  const [tokenExpired, setTokenExpired] = useState(false)
-  const [weekOffset,   setWeekOff]      = useState(0)
+export default function CalendarioTab({ uid, gcalToken, onGcalToken, gcalNeedsReconnect, onGcalExpired }) {
+  const [bloques,    setBloques]  = useState([])
+  const [loading,    setLoading]  = useState(false)
+  const [apiError,   setApiError] = useState(null)
+  const [weekOffset, setWeekOff]  = useState(0)
   const [form,         setForm]         = useState(null)
   const [saving,       setSaving]       = useState(false)
   const [gymStats,     setGymStats]     = useState({ streak: 0, lastGymDate: null, totalSessions: 0 })
@@ -84,7 +83,7 @@ export default function CalendarioTab({ uid, gcalToken, onGcalToken }) {
 
   // Cargar eventos de Google Calendar para la semana actual
   useEffect(() => {
-    if (!gcalToken || tokenExpired) { setBloques([]); return }
+    if (!gcalToken) { setBloques([]); return }
     const weekDays = getWeekDays(weekOffset)
     const timeMax  = new Date(weekDays[6])
     timeMax.setDate(timeMax.getDate() + 1)
@@ -104,20 +103,20 @@ export default function CalendarioTab({ uid, gcalToken, onGcalToken }) {
       })
       .catch(err => {
         if (cancelled) return
-        if (err.code === 'token_expired') setTokenExpired(true)
+        if (err.code === 'token_expired') onGcalExpired?.()
         else setApiError(err.message)
         setLoading(false)
       })
 
     return () => { cancelled = true }
-  }, [weekOffset, gcalToken, tokenExpired])
+  }, [weekOffset, gcalToken])
 
   // Mostrar modal de migración la primera vez que hay token válido
   useEffect(() => {
-    if (!gcalToken || tokenExpired) return
+    if (!gcalToken) return
     if (localStorage.getItem('cd_gcal_migration')) return
     setShowMigr(true)
-  }, [gcalToken, tokenExpired])
+  }, [gcalToken])
 
   // Auto-scroll a la hora actual
   useEffect(() => {
@@ -135,7 +134,7 @@ export default function CalendarioTab({ uid, gcalToken, onGcalToken }) {
   }
 
   async function reloadEventos() {
-    if (!gcalToken || tokenExpired) return
+    if (!gcalToken) return
     const weekDays = getWeekDays(weekOffset)
     const timeMax  = new Date(weekDays[6])
     timeMax.setDate(timeMax.getDate() + 1)
@@ -206,7 +205,7 @@ export default function CalendarioTab({ uid, gcalToken, onGcalToken }) {
       await reloadEventos()
       setForm(null)
     } catch (err) {
-      if (err.code === 'token_expired') setTokenExpired(true)
+      if (err.code === 'token_expired') onGcalExpired?.()
       else setApiError(err.message)
     } finally {
       setSaving(false)
@@ -221,7 +220,7 @@ export default function CalendarioTab({ uid, gcalToken, onGcalToken }) {
       await reloadEventos()
       setForm(null)
     } catch (err) {
-      if (err.code === 'token_expired') setTokenExpired(true)
+      if (err.code === 'token_expired') onGcalExpired?.()
       else setApiError(err.message)
     } finally {
       setSaving(false)
@@ -230,14 +229,14 @@ export default function CalendarioTab({ uid, gcalToken, onGcalToken }) {
 
   function handleReconnect() {
     requestCalendarAccess((at) => {
-      onGcalToken(at)      // guarda en sessionStorage + actualiza estado en App
-      setTokenExpired(false)
+      onGcalToken(at)
     })
   }
 
-  const weekStart = weekDays[0].toLocaleDateString('es-CL', { day: 'numeric', month: 'long' })
-  const weekEnd   = weekDays[6].toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })
-  const needsConnect = !gcalToken || tokenExpired
+  const weekStart    = weekDays[0].toLocaleDateString('es-CL', { day: 'numeric', month: 'long' })
+  const weekEnd      = weekDays[6].toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })
+  const needsConnect = !gcalToken && gcalNeedsReconnect
+  const everConnected = !!localStorage.getItem('gcal_connected_once')
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', position:'relative' }}>
@@ -327,11 +326,11 @@ export default function CalendarioTab({ uid, gcalToken, onGcalToken }) {
           </svg>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:'14px', fontWeight:600, color:'var(--text0)', marginBottom:'3px' }}>
-              {tokenExpired ? 'Sesión de Google Calendar expirada' : 'Conectá tu Google Calendar'}
+              {everConnected ? 'Sesión de Google Calendar expirada' : 'Conectá tu Google Calendar'}
             </div>
             <div style={{ fontSize:'12px', color:'var(--text2)' }}>
-              {tokenExpired
-                ? 'El token expiró después de 1 hora. Reconectá para seguir usando el calendario.'
+              {everConnected
+                ? 'No se pudo renovar la sesión automáticamente. Reconectá para continuar.'
                 : 'Para ver y editar tus eventos, necesitás autorizar el acceso a Google Calendar.'}
             </div>
           </div>
@@ -344,7 +343,7 @@ export default function CalendarioTab({ uid, gcalToken, onGcalToken }) {
               cursor:'pointer', whiteSpace:'nowrap',
             }}
           >
-            {tokenExpired ? 'Reconectar' : 'Conectar Google Calendar'}
+            {everConnected ? 'Reconectar' : 'Conectar Google Calendar'}
           </button>
         </div>
       )}

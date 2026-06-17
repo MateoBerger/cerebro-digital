@@ -45,7 +45,7 @@ function sliderColor(v) {
   return 'var(--green)'
 }
 
-export default function InicioTab({ uid, gcalToken }) {
+export default function InicioTab({ uid, gcalToken, onGcalExpired }) {
   const [fields, setFields]     = useState(DEFAULT_VALUES)
   const [saved, setSaved]       = useState(undefined) // undefined=cargando, null=no hay, obj=existe
   const [editing, setEditing]   = useState(false)
@@ -70,7 +70,7 @@ export default function InicioTab({ uid, gcalToken }) {
           }))
         setEvHoy(ev)
       })
-      .catch(() => setEvHoy([]))
+      .catch(err => { if (err.code === 'token_expired') onGcalExpired?.(); setEvHoy([]) })
   }, [gcalToken])
 
   useEffect(() => {

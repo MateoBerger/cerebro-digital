@@ -30,7 +30,7 @@ export default function App() {
   const [sidebarOpen, setSidebar] = useState(true)
   const [theme, setTheme]         = useState(() => localStorage.getItem('cd-theme') || 'dark')
   const [info, setInfo]           = useState('')
-  const { token: gcalToken, saveToken: saveGcalToken } = useGCalToken()
+  const { token: gcalToken, saveToken: saveGcalToken, needsReconnect: gcalNeedsReconnect, handleTokenExpired: onGcalExpired } = useGCalToken()
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -53,7 +53,7 @@ export default function App() {
     )
   }
 
-  if (!user) return <LoginPage />
+  if (!user) return <LoginPage onGcalToken={saveGcalToken} />
 
   return (
     <div className="app-shell">
@@ -67,12 +67,12 @@ export default function App() {
         onThemeToggle={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
       />
       <div className="app-content">
-        {tab === 'inicio'     && <InicioTab    uid={user.uid} gcalToken={gcalToken} />}
+        {tab === 'inicio'     && <InicioTab    uid={user.uid} gcalToken={gcalToken} onGcalExpired={onGcalExpired} />}
         {tab === 'dashboard'  && <DashboardTab uid={user.uid} onInfo={setInfo} />}
         {tab === 'diagram'    && <DiagramTab   uid={user.uid} onInfo={setInfo} />}
         {tab === 'dict'       && <DictTab      uid={user.uid} onInfo={setInfo} />}
         {tab === 'tareas'     && <TareasTab uid={user.uid} />}
-        {tab === 'calendario' && <CalendarioTab uid={user.uid} gcalToken={gcalToken} onGcalToken={saveGcalToken} />}
+        {tab === 'calendario' && <CalendarioTab uid={user.uid} gcalToken={gcalToken} onGcalToken={saveGcalToken} gcalNeedsReconnect={gcalNeedsReconnect} onGcalExpired={onGcalExpired} />}
         {tab === 'paes'       && <PAESTab uid={user.uid} />}
         {tab === 'asistente'  && <AsistenteTab uid={user.uid} />}
       </div>
