@@ -24,8 +24,9 @@ export default function LoginPage({ onGcalToken }) {
       const result = await signInWithPopup(auth, googleProvider)
       const at = result.credential?.accessToken
       if (at) onGcalToken?.(at)
-    } catch {
-      setError('No se pudo iniciar sesión. Intenta de nuevo.')
+    } catch (e) {
+      console.error('[Login] signInWithPopup error:', e)
+      setError(`No se pudo iniciar sesión (${e?.code ?? e?.message ?? 'error desconocido'})`)
       setLoading(false)
     }
   }
