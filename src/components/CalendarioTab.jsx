@@ -63,7 +63,7 @@ function minToTime(min) {
 
 // ── Componente principal ───────────────────────────────────────────────────────
 
-export default function CalendarioTab({ uid, gcalToken, onGcalToken, gcalNeedsReconnect, onGcalExpired }) {
+export default function CalendarioTab({ uid, gcalToken, onGcalToken, gcalNeedsReconnect, gcalSilentPending, onGcalExpired }) {
   const [bloques,    setBloques]  = useState([])
   const [loading,    setLoading]  = useState(false)
   const [apiError,   setApiError] = useState(null)
@@ -228,14 +228,16 @@ export default function CalendarioTab({ uid, gcalToken, onGcalToken, gcalNeedsRe
   }
 
   function handleReconnect() {
-    requestCalendarAccess((at) => {
-      onGcalToken(at)
-    })
+    requestCalendarAccess(
+      (at) => { onGcalToken(at) },
+      (err) => { setApiError(`No se pudo conectar Google Calendar: ${err}`) }
+    )
   }
 
   const weekStart    = weekDays[0].toLocaleDateString('es-CL', { day: 'numeric', month: 'long' })
   const weekEnd      = weekDays[6].toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })
-  const needsConnect = !gcalToken && gcalNeedsReconnect
+  // Mostrar banner cuando no hay token y no está en curso un refresh silencioso
+  const needsConnect = !gcalToken && !gcalSilentPending
   const everConnected = !!localStorage.getItem('gcal_connected_once')
 
   return (

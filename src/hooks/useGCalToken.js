@@ -60,49 +60,73 @@ async function requestSilentToken() {
 }
 
 // Reconexión manual — requiere gesto del usuario (clic en botón)
-export function requestCalendarAccess(onToken) {
+export function requestCalendarAccess(onToken, onError) {
   const gis = window.google?.accounts?.oauth2
-  if (!gis) { console.error('[GCal] GIS script no disponible'); return }
+  if (!gis) {
+    const msg = 'GIS script no disponible — recargá la página'
+    console.error('[GCal]', msg)
+    onError?.(msg)
+    return
+  }
 
   const client = gis.initTokenClient({
     client_id: GCAL_CLIENT_ID,
     scope:     'https://www.googleapis.com/auth/calendar',
-    callback:  (resp) => {
+    callback: (resp) => {
+      console.log('[GCal] callback recibido:', JSON.stringify(resp))
       if (resp.error || !resp.access_token) {
-        console.error('[GCal]', resp.error ?? 'sin access_token')
+        const msg = resp.error ?? 'sin access_token en la respuesta'
+        console.error('[GCal] error en callback:', msg)
+        onError?.(msg)
         return
       }
+      console.log('[GCal] token OK:', resp.access_token.slice(0, 16) + '…')
       onToken(resp.access_token)
     },
+    error_callback: (err) => {
+      // GIS llama a error_callback (no a callback) para errores de flujo como popup bloqueado
+      console.error('[GCal] error_callback:', JSON.stringify(err))
+      // 'popup_closed_by_user' es esperado cuando el usuario cierra sin autorizar
+      if (err?.type !== 'popup_closed_by_user') {
+        onError?.(err?.type ?? 'error desconocido')
+      }
+    },
   })
+  console.log('[GCal] requestAccessToken → abriendo popup OAuth')
   client.requestAccessToken()
 }
 
 export function useGCalToken() {
   const [token,          setToken]          = useState(loadToken)
   const [needsReconnect, setNeedsReconnect] = useState(false)
-  const refreshing                          = useRef(false)
+  // true solo mientras hay un intento de refresh silencioso en curso
+  const [silentPending,  setSilentPending]  = useState(
+    !loadToken() && !!localStorage.getItem(CONNECTED_KEY)
+  )
+  const refreshing = useRef(false)
 
   const silentRefresh = useCallback(async () => {
     if (refreshing.current) return
     refreshing.current = true
+    setSilentPending(true)
     try {
       const t = await requestSilentToken()
       if (t) {
         setToken(t)
         setNeedsReconnect(false)
       } else {
-        // Solo marca que necesita reconexión; NO borra el token actual (puede aún ser válido)
         setNeedsReconnect(true)
       }
     } finally {
       refreshing.current = false
+      setSilentPending(false)
     }
   }, [])
 
-  // Al montar: si no hay token en sessionStorage, intentar refresh silencioso
+  // Al montar: solo intenta refresh silencioso si el usuario ya conectó antes.
+  // Si nunca conectó, muestra el banner directamente sin abrir popups de GIS.
   useEffect(() => {
-    if (!loadToken()) silentRefresh()
+    if (!loadToken() && localStorage.getItem(CONNECTED_KEY)) silentRefresh()
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Renovación proactiva 5 min antes del vencimiento
@@ -119,6 +143,7 @@ export function useGCalToken() {
     saveGCalToken(accessToken)
     setToken(accessToken)
     setNeedsReconnect(false)
+    setSilentPending(false)
   }
 
   // Llamar cuando la Calendar API devuelva 401
@@ -128,5 +153,5 @@ export function useGCalToken() {
     silentRefresh()
   }
 
-  return { token, saveToken: save, needsReconnect, handleTokenExpired }
+  return { token, saveToken: save, needsReconnect, silentPending, handleTokenExpired }
 }
