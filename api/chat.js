@@ -1,5 +1,5 @@
 // Vercel Serverless — /api/chat
-// Asistente general: tareas y calendario via Gemini (gemini-2.5-flash)
+// Asistente general: tareas y calendario via Gemini (gemini-2.5-flash-lite)
 // Normaliza respuesta al formato {stop_reason, content:[...]} que consume useChat.js
 
 const MAX_HISTORY = 20  // últimos N mensajes del historial de conversación
@@ -322,7 +322,7 @@ export default async function handler(req, res) {
     generation_config: { max_output_tokens: 1024, temperature: 0.3 },
   }
 
-  const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`
+  const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${key}`
 
   async function callGemini() {
     return fetch(GEMINI_URL, {

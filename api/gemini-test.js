@@ -15,7 +15,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ ...diag, error: 'GEMINI_API_KEY no está configurada en Vercel' })
   }
 
-  const MODEL = 'gemini-2.5-flash'
+  const MODEL = 'gemini-2.5-flash-lite'
   const URL   = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`
   const body  = {
     contents: [{ role: 'user', parts: [{ text: 'Di solo "OK".' }] }],

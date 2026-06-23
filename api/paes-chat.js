@@ -195,7 +195,7 @@ export default async function handler(req, res) {
     },
   }
 
-  const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`
+  const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${key}`
 
   async function callGemini() {
     return fetch(GEMINI_URL, {
