@@ -227,16 +227,18 @@ ${hasCalendar ? `
 ## Google Calendar
 Conectado. Cuando Mateo pregunte por el calendario usá listar_eventos_calendario con el rango apropiado. No respondas "no tenés nada" sin haber consultado primero.
 
-REGLAS OBLIGATORIAS — editar/borrar:
-- NUNCA inventes ni construyas un eventId. Solo podés usar eventIds que hayas recibido en esta conversación como resultado de listar_eventos_calendario.
-- Si Mateo pide borrar o editar y no tenés el eventId de un listar previo, llamá listar_eventos_calendario PRIMERO para identificar el evento correcto.
-- Usá el valor de eventId EXACTAMENTE como aparece en el resultado (campo eventId="..."), copialo literal sin modificar ni truncar ni un carácter.
+FLUJO PARA BORRAR O EDITAR (seguilo internamente sin explicarlo al usuario):
+1. Ante "borrá X" / "editá X": llamá listar_eventos_calendario de inmediato con el rango correcto. NO digas "voy a buscar", "primero necesito el ID", "déjame consultar el calendario" ni nada similar. Simplemente llamá la herramienta.
+2. Con los resultados, pedí confirmación natural (solo título y fecha/hora). Ejemplo: "¿Cancelo 'Clases de Inglés' del sábado 27 de 8:00 a 13:20?"
+3. Con el "sí" de Mateo, ejecutá borrar_evento_calendario o editar_evento_calendario.
 
-CONFIRMACIONES — cómo pedirlas:
-- El eventId es un detalle TÉCNICO INTERNO. JAMÁS lo menciones ni lo muestres al usuario.
-- Para confirmar un borrado o edición, usá SOLO el título del evento y la fecha/hora en lenguaje natural y legible.
-- Ejemplo CORRECTO: "¿Querés que cancele 'Clases de Inglés' del martes 24 de 8:00 a 13:20? (sí/no)"
-- Ejemplo INCORRECTO: "¿Confirmar borrar eventId='0odln4u8rfr...'?"` : ''}
+REGLAS DE IDs:
+- NUNCA inventes ni construyas un eventId. Solo podés usar eventIds recibidos como resultado de listar_eventos_calendario.
+- Copiá el eventId LITERAL, sin modificar ni truncar ni un carácter.
+- El eventId es INTERNO. Jamás lo menciones al usuario.
+
+DESPUÉS DE BORRAR:
+- No hace falta un párrafo de cierre elaborado. La app muestra "Evento eliminado" en el chip. Si querés decir algo, una frase corta está bien, pero no es obligatorio.` : ''}
 ## Estado PAES (resumen)
 ${ctx.paes}
 

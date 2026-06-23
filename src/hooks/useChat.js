@@ -349,21 +349,34 @@ export function useChat(uid) {
           toolResults.push({ tool_use_id: block.id, result })
         }
 
-        const r2 = await fetch('/api/chat', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({
-            messages:          newApiMsgs,
-            context,
-            assistant_content: d1.content,
-            tool_results:      toolResults,
-            gcal_token:        gcalToken,
-          }),
-        })
-        const d2 = await parseResponse(r2)
-        checkError(d2)
-        const finalText = d2.content?.find(b => b.type === 'text')?.text || ''
-        if (finalText) pushUi({ id: `a2-${Date.now()}`, role: 'assistant', text: finalText })
+        // Si el turno fue solo borrado(s) exitosos, el mensaje de cierre se genera
+        // localmente para evitar la llamada extra que topa el rate limit.
+        const soloBorradosExitosos =
+          toolBlocks.length > 0 &&
+          toolBlocks.every(b => b.name === 'borrar_evento_calendario') &&
+          toolResults.every(tr => tr.result.includes('eliminado'))
+
+        let finalText = ''
+        if (soloBorradosExitosos) {
+          finalText = 'Listo, el evento fue eliminado del calendario.'
+          pushUi({ id: `a2-${Date.now()}`, role: 'assistant', text: finalText })
+        } else {
+          const r2 = await fetch('/api/chat', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({
+              messages:          newApiMsgs,
+              context,
+              assistant_content: d1.content,
+              tool_results:      toolResults,
+              gcal_token:        gcalToken,
+            }),
+          })
+          const d2 = await parseResponse(r2)
+          checkError(d2)
+          finalText = d2.content?.find(b => b.type === 'text')?.text || ''
+          if (finalText) pushUi({ id: `a2-${Date.now()}`, role: 'assistant', text: finalText })
+        }
 
         apiMsgsRef.current = [
           ...newApiMsgs,
