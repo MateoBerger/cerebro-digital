@@ -145,6 +145,8 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   const key = process.env.GEMINI_API_KEY
+  // Diagnóstico: loguear presencia y longitud de la key (nunca el valor)
+  console.log('[paes-chat] GEMINI_API_KEY present:', !!key, '| length:', key?.length ?? 0)
   if (!key) return res.status(500).json({ error: 'GEMINI_API_KEY no configurada en Vercel' })
 
   const { messages, context, assistant_content, tool_results } = req.body
@@ -193,20 +195,53 @@ export default async function handler(req, res) {
     },
   }
 
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
-      {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(body),
-      },
-    )
+  const MODEL      = 'gemini-2.5-flash'
+  const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`
+  console.log('[paes-chat] model:', MODEL, '| endpoint: .../v1beta/models/', MODEL, ':generateContent?key=***')
 
-    const data = await response.json()
-    if (!response.ok) return res.status(response.status).json(data)
+  async function callGemini(bodyOverride) {
+    return fetch(GEMINI_URL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(bodyOverride ?? body),
+    })
+  }
+
+  try {
+    // ── Llamada de prueba mínima (sin tools, solo "hola") para aislar si el error es la key ──
+    const probeBody = {
+      contents: [{ role: 'user', parts: [{ text: 'hola' }] }],
+      generation_config: { max_output_tokens: 10 },
+    }
+    const probe     = await callGemini(probeBody)
+    const probeText = await probe.text()
+    console.log('[paes-chat] probe status:', probe.status, '| body:', probeText.slice(0, 400))
+    if (!probe.ok) {
+      let probeData
+      try { probeData = JSON.parse(probeText) } catch { probeData = probeText }
+      return res.status(probe.status).json({
+        error:        `Google ${probe.status} en llamada mínima`,
+        google_error: probeData?.error || probeData,
+        diagnosis:    'El problema es la API key o el modelo, no el formato de tools. Revisar Vercel env vars.',
+      })
+    }
+
+    // ── Llamada real ──────────────────────────────────────────────────────────────────────
+    const response = await callGemini()
+    const rawText  = await response.text()
+    let data
+    try { data = JSON.parse(rawText) } catch { data = { raw: rawText } }
+
+    if (!response.ok) {
+      console.error('[paes-chat] Google error', response.status, JSON.stringify(data).slice(0, 600))
+      return res.status(response.status).json({
+        error:        `Google ${response.status}`,
+        google_error: data?.error || data,
+      })
+    }
     res.json(normalizeGeminiResponse(data))
   } catch (err) {
+    console.error('[paes-chat] fetch error:', err.message)
     res.status(500).json({ error: err.message })
   }
 }
