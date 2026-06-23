@@ -383,6 +383,25 @@ export default async function handler(req, res) {
       }
     }
 
+    // Errores transitorios de servidor — reintentar igual que 429 RPM
+    if (response.status === 500 || response.status === 502 || response.status === 503) {
+      const snippet = (await response.text()).slice(0, 300)
+      console.error(`[chat] ${response.status} transient:`, snippet)
+      await sleep(500)
+      response = await callGemini()
+      if (response.status === 500 || response.status === 502 || response.status === 503) {
+        await sleep(2000)
+        response = await callGemini()
+      }
+      if (response.status === 500 || response.status === 502 || response.status === 503) {
+        console.error('[chat] transient 5xx persists after retries, status:', response.status)
+        return res.status(200).json({
+          stop_reason: 'end_turn',
+          content: [{ type: 'text', text: 'Google tuvo un problema momentáneo. Intentá de nuevo en unos segundos.' }],
+        })
+      }
+    }
+
     const data = await readJson(response)
 
     if (!response.ok) {

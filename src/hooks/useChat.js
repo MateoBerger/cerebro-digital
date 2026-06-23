@@ -55,6 +55,17 @@ function toolLabel(name) {
   return labels[name] || 'Ejecutando acción…'
 }
 
+// Texto amigable para el chip de resultado — nunca expone IDs internos ni texto crudo
+function toolResultUiText(name, result) {
+  if (name === 'listar_eventos_calendario') {
+    const m = result.match(/^(\d+) evento\(s\)/)
+    if (m) return `${m[1]} evento(s) encontrado(s)`
+    if (result.startsWith('No hay')) return 'Sin eventos en ese rango'
+    return 'Calendario consultado'
+  }
+  return result
+}
+
 export function useChat(uid) {
   const [tareas,     setTareas]     = useState([])
   const [bloques,    setBloques]    = useState([])
@@ -308,7 +319,7 @@ export function useChat(uid) {
           } else {
             result = await executeTool(block.name, block.input)
           }
-          replaceUi(chipId, { text: result, pending: false })
+          replaceUi(chipId, { text: toolResultUiText(block.name, result), pending: false })
           toolResults.push({ tool_use_id: block.id, result })
         }
 
