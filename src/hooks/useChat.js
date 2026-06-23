@@ -226,8 +226,10 @@ export function useChat(uid) {
           await gcalEliminarEvento(gcalToken, toolInput.eventId)
           return 'Evento eliminado del calendario'
         } catch (e) {
-          if (e.message?.includes('404') || e.message?.includes('notFound')) {
-            return `No encontré el evento con eventId "${toolInput.eventId}". El ID puede estar desactualizado — volvé a listar los eventos para obtener el ID correcto.`
+          // 404 = no existe, 410 = ya fue borrado → el objetivo (que no esté) ya se cumple
+          if (e.message?.includes('404') || e.message?.includes('410') ||
+              e.message?.includes('notFound') || e.message?.includes('deleted')) {
+            return 'Evento eliminado del calendario'
           }
           throw e
         }
@@ -289,11 +291,23 @@ export function useChat(uid) {
 
         const toolBlocks = d1.content.filter(b => b.type === 'tool_use')
         const toolResults = []
+        const seenBorrar = new Set()  // evita doble DELETE del mismo eventId en un turno
 
         for (const block of toolBlocks) {
           const chipId = `chip-${block.id}`
           pushUi({ id: chipId, role: 'action', text: toolLabel(block.name), pending: true })
-          const result = await executeTool(block.name, block.input)
+          let result
+          if (block.name === 'borrar_evento_calendario') {
+            const eid = block.input?.eventId
+            if (eid && seenBorrar.has(eid)) {
+              result = 'Evento ya eliminado'
+            } else {
+              if (eid) seenBorrar.add(eid)
+              result = await executeTool(block.name, block.input)
+            }
+          } else {
+            result = await executeTool(block.name, block.input)
+          }
           replaceUi(chipId, { text: result, pending: false })
           toolResults.push({ tool_use_id: block.id, result })
         }
