@@ -2,6 +2,76 @@
 // Asistente general: tareas y calendario via Groq (Llama 3.3 70B)
 // Normaliza respuesta al formato {stop_reason, content:[...]} que consume useChat.js
 
+const GCAL_TOOLS = [
+  {
+    type: 'function',
+    function: {
+      name: 'listar_eventos_calendario',
+      description: 'Lista los eventos de Google Calendar en un rango de fechas. Usalo cuando Mateo pregunte qué tiene en el calendario, qué hay esta semana/hoy/mañana, etc. Siempre consultá esta herramienta antes de responder sobre el calendario.',
+      parameters: {
+        type: 'object',
+        properties: {
+          timeMin: { type: 'string', description: 'Inicio del rango ISO 8601, ej: "2025-06-22T00:00:00"' },
+          timeMax: { type: 'string', description: 'Fin del rango ISO 8601, ej: "2025-06-29T23:59:59"' },
+        },
+        required: ['timeMin', 'timeMax'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'crear_evento_calendario',
+      description: 'Crea un nuevo evento en Google Calendar',
+      parameters: {
+        type: 'object',
+        properties: {
+          titulo:      { type: 'string', description: 'Título del evento' },
+          fecha:       { type: 'string', description: 'Fecha YYYY-MM-DD' },
+          horaInicio:  { type: 'string', description: 'Hora de inicio HH:MM (24h)' },
+          horaFin:     { type: 'string', description: 'Hora de fin HH:MM (24h)' },
+          descripcion: { type: 'string', description: 'Descripción opcional' },
+          tipo:        { type: 'string', enum: ['clase', 'estudio', 'paes', 'libre', 'ejercicio', 'otro'] },
+        },
+        required: ['titulo', 'fecha', 'horaInicio', 'horaFin'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'editar_evento_calendario',
+      description: 'Edita un evento existente de Google Calendar. Solo incluí los campos que cambian; el resto se conserva. Si no tenés el eventId, primero usá listar_eventos_calendario.',
+      parameters: {
+        type: 'object',
+        properties: {
+          eventId:     { type: 'string', description: 'ID del evento (del resultado de listar_eventos_calendario)' },
+          titulo:      { type: 'string', description: 'Nuevo título (omitir si no cambia)' },
+          fecha:       { type: 'string', description: 'Nueva fecha YYYY-MM-DD (omitir si no cambia)' },
+          horaInicio:  { type: 'string', description: 'Nueva hora inicio HH:MM (omitir si no cambia)' },
+          horaFin:     { type: 'string', description: 'Nueva hora fin HH:MM (omitir si no cambia)' },
+          descripcion: { type: 'string', description: 'Nueva descripción (omitir si no cambia)' },
+        },
+        required: ['eventId'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'borrar_evento_calendario',
+      description: 'Elimina un evento de Google Calendar. Confirmá con Mateo antes de borrar si hay ambigüedad.',
+      parameters: {
+        type: 'object',
+        properties: {
+          eventId: { type: 'string', description: 'ID del evento a eliminar' },
+        },
+        required: ['eventId'],
+      },
+    },
+  },
+]
+
 const TOOLS = [
   {
     type: 'function',
@@ -133,7 +203,7 @@ function normalizeGroqResponse(data) {
   return { stop_reason: 'end_turn', content: [{ type: 'text', text: msg.content || '' }] }
 }
 
-function buildSystemPrompt(ctx) {
+function buildSystemPrompt(ctx, hasCalendar = false) {
   const DIAS = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']
   const hoyDia    = typeof ctx.todayDia === 'number' ? ctx.todayDia : 0
   const mañanaDia = (hoyDia + 1) % 7
@@ -154,9 +224,11 @@ ${ctx.checkin}
 ## Tareas pendientes
 ${ctx.tareas}
 
-## Bloques de hoy en el calendario
+## Bloques internos de hoy (sistema Firestore)
 ${ctx.calendario}
-
+${hasCalendar ? `
+## Google Calendar
+Conectado. Cuando Mateo pregunte qué tiene en el calendario, qué hay esta semana/hoy/mañana, o pida crear/editar/borrar un evento, usá las herramientas de Google Calendar. No inventes eventos ni respondas "no tenés nada" sin haber consultado primero listar_eventos_calendario con el rango apropiado.` : ''}
 ## Estado PAES (resumen)
 ${ctx.paes}
 
@@ -168,7 +240,7 @@ ${ctx.metas_diarias || 'Sin metas diarias'}
 ## Conversación normal (NO usar herramientas)
 Respondé de forma conversacional cuando Mateo salude, pregunte algo, cuente algo o charle. Ejemplos:
 - "hola", "buenas", "¿cómo estás?" → respondé con un saludo natural, quizás comentando el día o lo que tiene pendiente.
-- "¿qué tengo hoy?" → respondé describiendo su agenda y tareas, sin crear nada.
+- "¿qué tengo hoy?" → ${hasCalendar ? 'usá listar_eventos_calendario para el día de hoy y respondé con lo que encuentres.' : 'respondé describiendo su agenda y tareas, sin crear nada.'}
 - "¿cómo voy con la PAES?" → respondé con un resumen basado en el contexto.
 - Preguntas, reflexiones, comentarios → conversá normalmente.
 
@@ -195,7 +267,7 @@ export default async function handler(req, res) {
   const key = process.env.GROQ_API_KEY
   if (!key) return res.status(500).json({ error: 'GROQ_API_KEY no configurada en Vercel' })
 
-  const { messages, context, assistant_content, tool_results } = req.body
+  const { messages, context, assistant_content, tool_results, gcal_token } = req.body
 
   // Convertir mensajes al formato Groq
   let groqMessages = toGroqMessages(messages)
@@ -237,10 +309,10 @@ export default async function handler(req, res) {
         max_tokens:  1024,
         temperature: 0.3,
         messages: [
-          { role: 'system', content: buildSystemPrompt(context) },
+          { role: 'system', content: buildSystemPrompt(context, !!gcal_token) },
           ...groqMessages,
         ],
-        tools:       TOOLS,
+        tools:       gcal_token ? [...TOOLS, ...GCAL_TOOLS] : TOOLS,
         tool_choice: 'auto',
       }),
     })

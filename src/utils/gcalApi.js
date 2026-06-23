@@ -71,6 +71,17 @@ export async function gcalEliminarEvento(token, eventId) {
   return req(token, `${BASE}/${encodeURIComponent(eventId)}`, { method: 'DELETE' })
 }
 
+export async function gcalGetEvento(token, eventId) {
+  return req(token, `${BASE}/${encodeURIComponent(eventId)}`)
+}
+
+export async function gcalPatchEvento(token, eventId, patch) {
+  return req(token, `${BASE}/${encodeURIComponent(eventId)}`, {
+    method: 'PATCH',
+    body:   JSON.stringify(patch),
+  })
+}
+
 // ── Conversion: Google Calendar event → bloque interno ────
 
 export function gcalEventToBloque(gcalEvent, weekDays) {

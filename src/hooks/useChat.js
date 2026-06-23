@@ -6,6 +6,20 @@ import {
   subscribeCheckin,
   subscribeDailyGoalsConfig, subscribeDailyGoalsState, addDailyGoalItem,
 } from '../firebase/db'
+import {
+  gcalListarEventos,
+  gcalCrearEvento,
+  gcalGetEvento,
+  gcalPatchEvento,
+  gcalEliminarEvento,
+} from '../utils/gcalApi'
+
+// Devuelve el token de GCal si existe y no expiró, null en caso contrario
+function getGcalToken() {
+  const token = sessionStorage.getItem('gcal_token')
+  const exp   = Number(sessionStorage.getItem('gcal_token_exp') || 0)
+  return token && Date.now() < exp ? token : null
+}
 
 function chileNow() {
   // Devuelve un Date cuyo .getFullYear()/.getMonth()/.getDate()/.getDay()
@@ -29,10 +43,14 @@ function getWeekKey() {
 
 function toolLabel(name) {
   const labels = {
-    add_tarea:             'Creando tarea…',
-    complete_tarea:        'Actualizando tarea…',
-    add_bloque_calendario: 'Agregando bloque al calendario…',
-    add_meta_diaria:       'Agregando meta diaria…',
+    add_tarea:                 'Creando tarea…',
+    complete_tarea:            'Actualizando tarea…',
+    add_bloque_calendario:     'Agregando bloque al calendario…',
+    add_meta_diaria:           'Agregando meta diaria…',
+    listar_eventos_calendario: 'Consultando Google Calendar…',
+    crear_evento_calendario:   'Creando evento en Calendar…',
+    editar_evento_calendario:  'Editando evento en Calendar…',
+    borrar_evento_calendario:  'Eliminando evento de Calendar…',
   }
   return labels[name] || 'Ejecutando acción…'
 }
@@ -131,6 +149,72 @@ export function useChat(uid) {
         await addDailyGoalItem(uid, toolInput.label)
         return `Meta diaria "${toolInput.label}" agregada`
 
+      case 'listar_eventos_calendario': {
+        const gcalToken = getGcalToken()
+        if (!gcalToken) return 'Error: Google Calendar no está conectado o el token expiró'
+        const events = await gcalListarEventos(
+          gcalToken,
+          new Date(toolInput.timeMin),
+          new Date(toolInput.timeMax),
+        )
+        if (!events.length) return 'No hay eventos en ese rango de fechas'
+        return events.map(e => {
+          const start = e.start?.dateTime || e.start?.date || ''
+          const end   = e.end?.dateTime   || e.end?.date   || ''
+          const desc  = e.description ? ` | ${e.description}` : ''
+          return `[${e.id}] "${e.summary || '(sin título)'}" · ${start} → ${end}${desc}`
+        }).join('\n')
+      }
+
+      case 'crear_evento_calendario': {
+        const gcalToken = getGcalToken()
+        if (!gcalToken) return 'Error: Google Calendar no está conectado o el token expiró'
+        const dayDate = new Date(`${toolInput.fecha}T12:00:00`)
+        const dow = dayDate.getDay()
+        const dia = dow === 0 ? 6 : dow - 1
+        await gcalCrearEvento(gcalToken, {
+          titulo:      toolInput.titulo,
+          descripcion: toolInput.descripcion || '',
+          tipo:        toolInput.tipo || 'otro',
+          dia,
+          horaInicio:  toolInput.horaInicio,
+          horaFin:     toolInput.horaFin,
+          recurrente:  false,
+        }, dayDate)
+        return `Evento "${toolInput.titulo}" creado el ${toolInput.fecha} de ${toolInput.horaInicio} a ${toolInput.horaFin}`
+      }
+
+      case 'editar_evento_calendario': {
+        const gcalToken = getGcalToken()
+        if (!gcalToken) return 'Error: Google Calendar no está conectado o el token expiró'
+        const patch = {}
+        if (toolInput.titulo      !== undefined) patch.summary     = toolInput.titulo
+        if (toolInput.descripcion !== undefined) patch.description = toolInput.descripcion
+        if (toolInput.fecha || toolInput.horaInicio || toolInput.horaFin) {
+          const existing  = await gcalGetEvento(gcalToken, toolInput.eventId)
+          const exStart   = new Date(existing.start?.dateTime || '')
+          const exEnd     = new Date(existing.end?.dateTime   || '')
+          const pad       = n => String(n).padStart(2, '0')
+          const exDate    = `${exStart.getFullYear()}-${pad(exStart.getMonth()+1)}-${pad(exStart.getDate())}`
+          const exIni     = `${pad(exStart.getHours())}:${pad(exStart.getMinutes())}`
+          const exFin     = `${pad(exEnd.getHours())}:${pad(exEnd.getMinutes())}`
+          const date      = toolInput.fecha      ?? exDate
+          const horaIni   = toolInput.horaInicio ?? exIni
+          const horaFin   = toolInput.horaFin    ?? exFin
+          patch.start = { dateTime: `${date}T${horaIni}:00`, timeZone: 'America/Santiago' }
+          patch.end   = { dateTime: `${date}T${horaFin}:00`, timeZone: 'America/Santiago' }
+        }
+        await gcalPatchEvento(gcalToken, toolInput.eventId, patch)
+        return 'Evento actualizado correctamente'
+      }
+
+      case 'borrar_evento_calendario': {
+        const gcalToken = getGcalToken()
+        if (!gcalToken) return 'Error: Google Calendar no está conectado o el token expiró'
+        await gcalEliminarEvento(gcalToken, toolInput.eventId)
+        return 'Evento eliminado del calendario'
+      }
+
       default:
         return 'Herramienta no reconocida'
     }
@@ -170,12 +254,13 @@ export function useChat(uid) {
     const newApiMsgs = [...apiMsgsRef.current, { role: 'user', content: text }]
 
     try {
-      const context = buildContext()
+      const context   = buildContext()
+      const gcalToken = getGcalToken()
 
       const r1 = await fetch('/api/chat', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ messages: newApiMsgs, context }),
+        body:    JSON.stringify({ messages: newApiMsgs, context, gcal_token: gcalToken }),
       })
       const d1 = await parseResponse(r1)
       checkError(d1)
@@ -203,6 +288,7 @@ export function useChat(uid) {
             context,
             assistant_content: d1.content,
             tool_results:      toolResults,
+            gcal_token:        gcalToken,
           }),
         })
         const d2 = await parseResponse(r2)
