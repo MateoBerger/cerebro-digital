@@ -158,11 +158,12 @@ export function useChat(uid) {
           new Date(toolInput.timeMax),
         )
         if (!events.length) return 'No hay eventos en ese rango de fechas'
-        return events.map(e => {
+        return `${events.length} evento(s):\n` + events.map((e, i) => {
           const start = e.start?.dateTime || e.start?.date || ''
           const end   = e.end?.dateTime   || e.end?.date   || ''
-          const desc  = e.description ? ` | ${e.description}` : ''
-          return `[${e.id}] "${e.summary || '(sin título)'}" · ${start} → ${end}${desc}`
+          const desc  = e.description ? ` | nota: ${e.description}` : ''
+          // eventId con comillas para que el modelo lo copie literal
+          return `${i + 1}. eventId="${e.id}" | "${e.summary || '(sin título)'}" | ${start} → ${end}${desc}`
         }).join('\n')
       }
 
@@ -187,32 +188,49 @@ export function useChat(uid) {
       case 'editar_evento_calendario': {
         const gcalToken = getGcalToken()
         if (!gcalToken) return 'Error: Google Calendar no está conectado o el token expiró'
-        const patch = {}
-        if (toolInput.titulo      !== undefined) patch.summary     = toolInput.titulo
-        if (toolInput.descripcion !== undefined) patch.description = toolInput.descripcion
-        if (toolInput.fecha || toolInput.horaInicio || toolInput.horaFin) {
-          const existing  = await gcalGetEvento(gcalToken, toolInput.eventId)
-          const exStart   = new Date(existing.start?.dateTime || '')
-          const exEnd     = new Date(existing.end?.dateTime   || '')
-          const pad       = n => String(n).padStart(2, '0')
-          const exDate    = `${exStart.getFullYear()}-${pad(exStart.getMonth()+1)}-${pad(exStart.getDate())}`
-          const exIni     = `${pad(exStart.getHours())}:${pad(exStart.getMinutes())}`
-          const exFin     = `${pad(exEnd.getHours())}:${pad(exEnd.getMinutes())}`
-          const date      = toolInput.fecha      ?? exDate
-          const horaIni   = toolInput.horaInicio ?? exIni
-          const horaFin   = toolInput.horaFin    ?? exFin
-          patch.start = { dateTime: `${date}T${horaIni}:00`, timeZone: 'America/Santiago' }
-          patch.end   = { dateTime: `${date}T${horaFin}:00`, timeZone: 'America/Santiago' }
+        console.log('[GCal] editar_evento_calendario → eventId:', toolInput.eventId)
+        try {
+          const patch = {}
+          if (toolInput.titulo      !== undefined) patch.summary     = toolInput.titulo
+          if (toolInput.descripcion !== undefined) patch.description = toolInput.descripcion
+          if (toolInput.fecha || toolInput.horaInicio || toolInput.horaFin) {
+            const existing  = await gcalGetEvento(gcalToken, toolInput.eventId)
+            const exStart   = new Date(existing.start?.dateTime || '')
+            const exEnd     = new Date(existing.end?.dateTime   || '')
+            const pad       = n => String(n).padStart(2, '0')
+            const exDate    = `${exStart.getFullYear()}-${pad(exStart.getMonth()+1)}-${pad(exStart.getDate())}`
+            const exIni     = `${pad(exStart.getHours())}:${pad(exStart.getMinutes())}`
+            const exFin     = `${pad(exEnd.getHours())}:${pad(exEnd.getMinutes())}`
+            const date      = toolInput.fecha      ?? exDate
+            const horaIni   = toolInput.horaInicio ?? exIni
+            const horaFin   = toolInput.horaFin    ?? exFin
+            patch.start = { dateTime: `${date}T${horaIni}:00`, timeZone: 'America/Santiago' }
+            patch.end   = { dateTime: `${date}T${horaFin}:00`, timeZone: 'America/Santiago' }
+          }
+          await gcalPatchEvento(gcalToken, toolInput.eventId, patch)
+          return 'Evento actualizado correctamente'
+        } catch (e) {
+          if (e.message?.includes('404') || e.message?.includes('notFound')) {
+            return `No encontré el evento con eventId "${toolInput.eventId}". Volvé a listar los eventos para obtener el ID correcto.`
+          }
+          throw e
         }
-        await gcalPatchEvento(gcalToken, toolInput.eventId, patch)
-        return 'Evento actualizado correctamente'
       }
 
       case 'borrar_evento_calendario': {
         const gcalToken = getGcalToken()
         if (!gcalToken) return 'Error: Google Calendar no está conectado o el token expiró'
-        await gcalEliminarEvento(gcalToken, toolInput.eventId)
-        return 'Evento eliminado del calendario'
+        console.log('[GCal] borrar_evento_calendario → eventId:', toolInput.eventId)
+        console.log('[GCal] DELETE URL:', `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(toolInput.eventId)}`)
+        try {
+          await gcalEliminarEvento(gcalToken, toolInput.eventId)
+          return 'Evento eliminado del calendario'
+        } catch (e) {
+          if (e.message?.includes('404') || e.message?.includes('notFound')) {
+            return `No encontré el evento con eventId "${toolInput.eventId}". El ID puede estar desactualizado — volvé a listar los eventos para obtener el ID correcto.`
+          }
+          throw e
+        }
       }
 
       default:

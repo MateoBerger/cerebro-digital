@@ -228,7 +228,12 @@ ${ctx.tareas}
 ${ctx.calendario}
 ${hasCalendar ? `
 ## Google Calendar
-Conectado. Cuando Mateo pregunte qué tiene en el calendario, qué hay esta semana/hoy/mañana, o pida crear/editar/borrar un evento, usá las herramientas de Google Calendar. No inventes eventos ni respondas "no tenés nada" sin haber consultado primero listar_eventos_calendario con el rango apropiado.` : ''}
+Conectado. Cuando Mateo pregunte por el calendario usá listar_eventos_calendario con el rango apropiado. No respondas "no tenés nada" sin haber consultado primero.
+
+REGLAS OBLIGATORIAS — editar/borrar:
+- NUNCA inventes ni construyas un eventId. Solo podés usar eventIds que hayas recibido en esta conversación como resultado de listar_eventos_calendario.
+- Si Mateo pide borrar o editar y no tenés el eventId de un listar previo, llamá listar_eventos_calendario PRIMERO para identificar el evento correcto.
+- Usá el valor de eventId EXACTAMENTE como aparece en el resultado (campo eventId="..."), copialo literal sin modificar ni truncar ni un carácter.` : ''}
 ## Estado PAES (resumen)
 ${ctx.paes}
 
