@@ -195,40 +195,38 @@ export default async function handler(req, res) {
     },
   }
 
-  const MODEL      = 'gemini-2.5-flash'
-  const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`
-  console.log('[paes-chat] model:', MODEL, '| endpoint: .../v1beta/models/', MODEL, ':generateContent?key=***')
+  const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`
 
-  async function callGemini(bodyOverride) {
+  async function callGemini() {
     return fetch(GEMINI_URL, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(bodyOverride ?? body),
+      body:    JSON.stringify(body),
     })
   }
 
+  async function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
+
   try {
-    // ── Llamada de prueba mínima (sin tools, solo "hola") para aislar si el error es la key ──
-    const probeBody = {
-      contents: [{ role: 'user', parts: [{ text: 'hola' }] }],
-      generation_config: { max_output_tokens: 10 },
+    let response = await callGemini()
+
+    // Reintentar ante rate limit: 500 ms → 2 s → mensaje amable
+    if (response.status === 429) {
+      await sleep(500)
+      response = await callGemini()
     }
-    const probe     = await callGemini(probeBody)
-    const probeText = await probe.text()
-    console.log('[paes-chat] probe status:', probe.status, '| body:', probeText.slice(0, 400))
-    if (!probe.ok) {
-      let probeData
-      try { probeData = JSON.parse(probeText) } catch { probeData = probeText }
-      return res.status(probe.status).json({
-        error:        `Google ${probe.status} en llamada mínima`,
-        google_error: probeData?.error || probeData,
-        diagnosis:    'El problema es la API key o el modelo, no el formato de tools. Revisar Vercel env vars.',
+    if (response.status === 429) {
+      await sleep(2000)
+      response = await callGemini()
+    }
+    if (response.status === 429) {
+      return res.status(200).json({
+        stop_reason: 'end_turn',
+        content: [{ type: 'text', text: 'Estoy un poco saturado en este momento. Esperá unos segundos y volvé a intentarlo.' }],
       })
     }
 
-    // ── Llamada real ──────────────────────────────────────────────────────────────────────
-    const response = await callGemini()
-    const rawText  = await response.text()
+    const rawText = await response.text()
     let data
     try { data = JSON.parse(rawText) } catch { data = { raw: rawText } }
 

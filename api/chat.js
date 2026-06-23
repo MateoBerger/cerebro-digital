@@ -230,7 +230,13 @@ Conectado. Cuando Mateo pregunte por el calendario usá listar_eventos_calendari
 REGLAS OBLIGATORIAS — editar/borrar:
 - NUNCA inventes ni construyas un eventId. Solo podés usar eventIds que hayas recibido en esta conversación como resultado de listar_eventos_calendario.
 - Si Mateo pide borrar o editar y no tenés el eventId de un listar previo, llamá listar_eventos_calendario PRIMERO para identificar el evento correcto.
-- Usá el valor de eventId EXACTAMENTE como aparece en el resultado (campo eventId="..."), copialo literal sin modificar ni truncar ni un carácter.` : ''}
+- Usá el valor de eventId EXACTAMENTE como aparece en el resultado (campo eventId="..."), copialo literal sin modificar ni truncar ni un carácter.
+
+CONFIRMACIONES — cómo pedirlas:
+- El eventId es un detalle TÉCNICO INTERNO. JAMÁS lo menciones ni lo muestres al usuario.
+- Para confirmar un borrado o edición, usá SOLO el título del evento y la fecha/hora en lenguaje natural y legible.
+- Ejemplo CORRECTO: "¿Querés que cancele 'Clases de Inglés' del martes 24 de 8:00 a 13:20? (sí/no)"
+- Ejemplo INCORRECTO: "¿Confirmar borrar eventId='0odln4u8rfr...'?"` : ''}
 ## Estado PAES (resumen)
 ${ctx.paes}
 
@@ -316,50 +322,35 @@ export default async function handler(req, res) {
     generation_config: { max_output_tokens: 1024, temperature: 0.3 },
   }
 
-  const MODEL    = 'gemini-2.5-flash'
-  const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`
-  console.log('[chat] model:', MODEL, '| endpoint: .../v1beta/models/', MODEL, ':generateContent?key=***')
+  const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`
 
-  async function callGemini(bodyOverride) {
+  async function callGemini() {
     return fetch(GEMINI_URL, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(bodyOverride ?? geminiBody),
+      body:    JSON.stringify(geminiBody),
     })
   }
 
-  try {
-    // ── Llamada de prueba mínima (sin tools, solo "hola") para aislar si el error es la key ──
-    const probeBody = {
-      contents: [{ role: 'user', parts: [{ text: 'hola' }] }],
-      generation_config: { max_output_tokens: 10 },
-    }
-    const probe = await callGemini(probeBody)
-    const probeText = await probe.text()
-    console.log('[chat] probe status:', probe.status, '| body:', probeText.slice(0, 400))
-    if (!probe.ok) {
-      let probeData
-      try { probeData = JSON.parse(probeText) } catch { probeData = probeText }
-      return res.status(probe.status).json({
-        error:       `Google ${probe.status} en llamada mínima`,
-        google_error: probeData?.error || probeData,
-        diagnosis:   'El problema es la API key o el modelo, no el formato de tools. Revisar Vercel env vars.',
-      })
-    }
+  async function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
 
-    // ── Llamada real ──────────────────────────────────────────────────────────────────────
+  try {
     let response = await callGemini()
 
-    // Reintentar una vez ante rate limit
+    // Reintentar ante rate limit: 500 ms → 2 s → mensaje amable
     if (response.status === 429) {
-      await new Promise(r => setTimeout(r, 3000))
+      await sleep(500)
       response = await callGemini()
-      if (response.status === 429) {
-        return res.status(200).json({
-          stop_reason: 'end_turn',
-          content: [{ type: 'text', text: 'Hay muchas solicitudes en este momento. Esperá unos segundos y volvé a intentarlo.' }],
-        })
-      }
+    }
+    if (response.status === 429) {
+      await sleep(2000)
+      response = await callGemini()
+    }
+    if (response.status === 429) {
+      return res.status(200).json({
+        stop_reason: 'end_turn',
+        content: [{ type: 'text', text: 'Estoy un poco saturado en este momento. Esperá unos segundos y volvé a intentarlo.' }],
+      })
     }
 
     const rawText = await response.text()
@@ -369,7 +360,7 @@ export default async function handler(req, res) {
     if (!response.ok) {
       console.error('[chat] Google error', response.status, JSON.stringify(data).slice(0, 600))
       return res.status(response.status).json({
-        error:       `Google ${response.status}`,
+        error:        `Google ${response.status}`,
         google_error: data?.error || data,
       })
     }
