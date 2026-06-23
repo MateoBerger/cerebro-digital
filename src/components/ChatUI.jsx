@@ -1,4 +1,6 @@
 import React, { useEffect, useRef } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 function LoadingDots() {
   return (
@@ -65,12 +67,16 @@ function ChatMessage({ msg }) {
         background: isUser
           ? 'var(--accent)'
           : msg.isError ? 'rgba(240,114,114,.12)' : 'var(--bg2)',
-        color:   isUser ? '#fff' : msg.isError ? '#f07272' : 'var(--text0)',
-        border:  isUser ? 'none' : `1px solid ${msg.isError ? 'rgba(240,114,114,.25)' : 'var(--border)'}`,
+        color:    isUser ? '#fff' : msg.isError ? '#f07272' : 'var(--text0)',
+        border:   isUser ? 'none' : `1px solid ${msg.isError ? 'rgba(240,114,114,.25)' : 'var(--border)'}`,
         fontSize: '14px', lineHeight: 1.55,
-        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+        whiteSpace:  isUser ? 'pre-wrap' : undefined,
+        wordBreak:   'break-word',
       }}>
-        {msg.text}
+        {isUser
+          ? msg.text
+          : <ReactMarkdown className="chat-md" remarkPlugins={[remarkGfm]}>{msg.text || ''}</ReactMarkdown>
+        }
       </div>
     </div>
   )
