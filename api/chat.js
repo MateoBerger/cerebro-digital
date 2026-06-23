@@ -1,206 +1,203 @@
 // Vercel Serverless — /api/chat
-// Asistente general: tareas y calendario via Groq (Llama 3.3 70B)
+// Asistente general: tareas y calendario via Gemini (gemini-2.5-flash)
 // Normaliza respuesta al formato {stop_reason, content:[...]} que consume useChat.js
 
-const GCAL_TOOLS = [
+const MAX_HISTORY = 20  // últimos N mensajes del historial de conversación
+
+// ── Declaraciones de herramientas (formato Gemini) ──────────────
+const GCAL_TOOL_DECLS = [
   {
-    type: 'function',
-    function: {
-      name: 'listar_eventos_calendario',
-      description: 'Lista los eventos de Google Calendar en un rango de fechas. Usalo cuando Mateo pregunte qué tiene en el calendario, qué hay esta semana/hoy/mañana, etc. Siempre consultá esta herramienta antes de responder sobre el calendario.',
-      parameters: {
-        type: 'object',
-        properties: {
-          timeMin: { type: 'string', description: 'Inicio del rango ISO 8601, ej: "2025-06-22T00:00:00"' },
-          timeMax: { type: 'string', description: 'Fin del rango ISO 8601, ej: "2025-06-29T23:59:59"' },
-        },
-        required: ['timeMin', 'timeMax'],
+    name: 'listar_eventos_calendario',
+    description: 'Lista los eventos de Google Calendar en un rango de fechas. Usalo cuando Mateo pregunte qué tiene en el calendario, qué hay esta semana/hoy/mañana, etc. Siempre consultá esta herramienta antes de responder sobre el calendario.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        timeMin: { type: 'STRING', description: 'Inicio del rango ISO 8601, ej: "2025-06-22T00:00:00"' },
+        timeMax: { type: 'STRING', description: 'Fin del rango ISO 8601, ej: "2025-06-29T23:59:59"' },
       },
+      required: ['timeMin', 'timeMax'],
     },
   },
   {
-    type: 'function',
-    function: {
-      name: 'crear_evento_calendario',
-      description: 'Crea un nuevo evento en Google Calendar',
-      parameters: {
-        type: 'object',
-        properties: {
-          titulo:      { type: 'string', description: 'Título del evento' },
-          fecha:       { type: 'string', description: 'Fecha YYYY-MM-DD' },
-          horaInicio:  { type: 'string', description: 'Hora de inicio HH:MM (24h)' },
-          horaFin:     { type: 'string', description: 'Hora de fin HH:MM (24h)' },
-          descripcion: { type: 'string', description: 'Descripción opcional' },
-          tipo:        { type: 'string', enum: ['clase', 'estudio', 'paes', 'libre', 'ejercicio', 'otro'] },
-        },
-        required: ['titulo', 'fecha', 'horaInicio', 'horaFin'],
+    name: 'crear_evento_calendario',
+    description: 'Crea un nuevo evento en Google Calendar',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        titulo:      { type: 'STRING', description: 'Título del evento' },
+        fecha:       { type: 'STRING', description: 'Fecha YYYY-MM-DD' },
+        horaInicio:  { type: 'STRING', description: 'Hora de inicio HH:MM (24h)' },
+        horaFin:     { type: 'STRING', description: 'Hora de fin HH:MM (24h)' },
+        descripcion: { type: 'STRING', description: 'Descripción opcional' },
+        tipo:        { type: 'STRING', enum: ['clase', 'estudio', 'paes', 'libre', 'ejercicio', 'otro'] },
       },
+      required: ['titulo', 'fecha', 'horaInicio', 'horaFin'],
     },
   },
   {
-    type: 'function',
-    function: {
-      name: 'editar_evento_calendario',
-      description: 'Edita un evento existente de Google Calendar. Solo incluí los campos que cambian; el resto se conserva. Si no tenés el eventId, primero usá listar_eventos_calendario.',
-      parameters: {
-        type: 'object',
-        properties: {
-          eventId:     { type: 'string', description: 'ID del evento (del resultado de listar_eventos_calendario)' },
-          titulo:      { type: 'string', description: 'Nuevo título (omitir si no cambia)' },
-          fecha:       { type: 'string', description: 'Nueva fecha YYYY-MM-DD (omitir si no cambia)' },
-          horaInicio:  { type: 'string', description: 'Nueva hora inicio HH:MM (omitir si no cambia)' },
-          horaFin:     { type: 'string', description: 'Nueva hora fin HH:MM (omitir si no cambia)' },
-          descripcion: { type: 'string', description: 'Nueva descripción (omitir si no cambia)' },
-        },
-        required: ['eventId'],
+    name: 'editar_evento_calendario',
+    description: 'Edita un evento existente de Google Calendar. Solo incluí los campos que cambian; el resto se conserva. Si no tenés el eventId, primero usá listar_eventos_calendario.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        eventId:     { type: 'STRING', description: 'ID del evento (del resultado de listar_eventos_calendario)' },
+        titulo:      { type: 'STRING', description: 'Nuevo título (omitir si no cambia)' },
+        fecha:       { type: 'STRING', description: 'Nueva fecha YYYY-MM-DD (omitir si no cambia)' },
+        horaInicio:  { type: 'STRING', description: 'Nueva hora inicio HH:MM (omitir si no cambia)' },
+        horaFin:     { type: 'STRING', description: 'Nueva hora fin HH:MM (omitir si no cambia)' },
+        descripcion: { type: 'STRING', description: 'Nueva descripción (omitir si no cambia)' },
       },
+      required: ['eventId'],
     },
   },
   {
-    type: 'function',
-    function: {
-      name: 'borrar_evento_calendario',
-      description: 'Elimina un evento de Google Calendar. Confirmá con Mateo antes de borrar si hay ambigüedad.',
-      parameters: {
-        type: 'object',
-        properties: {
-          eventId: { type: 'string', description: 'ID del evento a eliminar' },
-        },
-        required: ['eventId'],
+    name: 'borrar_evento_calendario',
+    description: 'Elimina un evento de Google Calendar. Confirmá con Mateo antes de borrar si hay ambigüedad.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        eventId: { type: 'STRING', description: 'ID del evento a eliminar' },
       },
+      required: ['eventId'],
     },
   },
 ]
 
-const TOOLS = [
+const TASK_TOOL_DECLS = [
   {
-    type: 'function',
-    function: {
-      name: 'add_tarea',
-      description: 'Crea una nueva tarea en el sistema de Mateo',
-      parameters: {
-        type: 'object',
-        properties: {
-          titulo:      { type: 'string',  description: 'Título de la tarea' },
-          descripcion: { type: 'string',  description: 'Descripción opcional' },
-          categoria:   { type: 'string',  enum: ['academico', 'paes', 'personal', 'sistema'] },
-          prioridad:   { type: 'string',  enum: ['alta', 'media', 'baja'] },
-          alcance:     { type: 'string',  enum: ['diaria', 'semanal', 'general'] },
-          fecha:       { type: 'string',  description: 'Fecha de vencimiento YYYY-MM-DD (opcional)' },
-        },
-        required: ['titulo', 'categoria', 'prioridad', 'alcance'],
+    name: 'add_tarea',
+    description: 'Crea una nueva tarea en el sistema de Mateo',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        titulo:      { type: 'STRING',  description: 'Título de la tarea' },
+        descripcion: { type: 'STRING',  description: 'Descripción opcional' },
+        categoria:   { type: 'STRING',  enum: ['academico', 'paes', 'personal', 'sistema'] },
+        prioridad:   { type: 'STRING',  enum: ['alta', 'media', 'baja'] },
+        alcance:     { type: 'STRING',  enum: ['diaria', 'semanal', 'general'] },
+        fecha:       { type: 'STRING',  description: 'Fecha de vencimiento YYYY-MM-DD (opcional)' },
       },
+      required: ['titulo', 'categoria', 'prioridad', 'alcance'],
     },
   },
   {
-    type: 'function',
-    function: {
-      name: 'complete_tarea',
-      description: 'Marca una tarea existente como completada o pendiente',
-      parameters: {
-        type: 'object',
-        properties: {
-          tarea_id:   { type: 'string',  description: 'ID de la tarea (del contexto, empieza con tarea_)' },
-          completada: { type: 'boolean', description: 'true = completar, false = volver a pendiente' },
-        },
-        required: ['tarea_id', 'completada'],
+    name: 'complete_tarea',
+    description: 'Marca una tarea existente como completada o pendiente',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        tarea_id:   { type: 'STRING',  description: 'ID de la tarea (del contexto, empieza con tarea_)' },
+        completada: { type: 'BOOLEAN', description: 'true = completar, false = volver a pendiente' },
       },
+      required: ['tarea_id', 'completada'],
     },
   },
   {
-    type: 'function',
-    function: {
-      name: 'add_bloque_calendario',
-      description: 'Agrega un bloque de tiempo al calendario semanal',
-      parameters: {
-        type: 'object',
-        properties: {
-          titulo:     { type: 'string',  description: 'Nombre del bloque' },
-          tipo:       { type: 'string',  enum: ['clase', 'estudio', 'paes', 'libre', 'ejercicio', 'otro'] },
-          dia:        { type: 'integer', description: '0=Lunes 1=Martes 2=Miércoles 3=Jueves 4=Viernes 5=Sábado 6=Domingo' },
-          horaInicio: { type: 'string',  description: 'HH:MM en formato 24 horas' },
-          horaFin:    { type: 'string',  description: 'HH:MM en formato 24 horas' },
-          recurrente: { type: 'boolean', description: 'true = todas las semanas, false = solo esta semana' },
-        },
-        required: ['titulo', 'tipo', 'dia', 'horaInicio', 'horaFin', 'recurrente'],
+    name: 'add_bloque_calendario',
+    description: 'Agrega un bloque de tiempo al calendario semanal',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        titulo:     { type: 'STRING',  description: 'Nombre del bloque' },
+        tipo:       { type: 'STRING',  enum: ['clase', 'estudio', 'paes', 'libre', 'ejercicio', 'otro'] },
+        dia:        { type: 'INTEGER', description: '0=Lunes 1=Martes 2=Miércoles 3=Jueves 4=Viernes 5=Sábado 6=Domingo' },
+        horaInicio: { type: 'STRING',  description: 'HH:MM en formato 24 horas' },
+        horaFin:    { type: 'STRING',  description: 'HH:MM en formato 24 horas' },
+        recurrente: { type: 'BOOLEAN', description: 'true = todas las semanas, false = solo esta semana' },
       },
+      required: ['titulo', 'tipo', 'dia', 'horaInicio', 'horaFin', 'recurrente'],
     },
   },
   {
-    type: 'function',
-    function: {
-      name: 'add_meta_diaria',
-      description: 'Agrega un nuevo ítem a la lista de metas diarias básicas de Mateo',
-      parameters: {
-        type: 'object',
-        properties: {
-          label: { type: 'string', description: 'Nombre corto del ítem (ej: "Meditar 5 min", "Leer 30 min")' },
-        },
-        required: ['label'],
+    name: 'add_meta_diaria',
+    description: 'Agrega un nuevo ítem a la lista de metas diarias básicas de Mateo',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        label: { type: 'STRING', description: 'Nombre corto del ítem (ej: "Meditar 5 min", "Leer 30 min")' },
       },
+      required: ['label'],
     },
   },
 ]
 
-// ── Conversión formato normalizado → Groq ──────────────────────
-// Los messages en apiMsgsRef (frontend) pueden contener content de tipo array
-// con bloques tool_use/tool_result cuando hay historial de tool calls anteriores.
-function toGroqMessages(messages) {
-  const result = []
+// ── Conversión mensajes frontend → Gemini contents ─────────────
+// Los mensajes en apiMsgsRef usan el formato interno con bloques tool_use/tool_result.
+// Gemini espera contents con roles 'user'/'model' y parts con functionCall/functionResponse.
+function toGeminiContents(messages) {
+  // Construir mapa tool_use_id → nombre de función (para functionResponse)
+  const toolIdToName = {}
+  for (const msg of messages) {
+    if (msg.role === 'assistant' && Array.isArray(msg.content)) {
+      for (const b of msg.content) {
+        if (b.type === 'tool_use' && b.id && b.name) toolIdToName[b.id] = b.name
+      }
+    }
+  }
+
+  const contents = []
   for (const msg of messages) {
     if (typeof msg.content === 'string') {
-      result.push({ role: msg.role, content: msg.content })
+      if (!msg.content.trim()) continue
+      const role = msg.role === 'assistant' ? 'model' : 'user'
+      contents.push({ role, parts: [{ text: msg.content }] })
     } else if (Array.isArray(msg.content)) {
       if (msg.role === 'assistant') {
-        const textBlock  = msg.content.find(b => b.type === 'text')
-        const toolBlocks = msg.content.filter(b => b.type === 'tool_use')
-        const groqMsg = {
-          role:    'assistant',
-          content: textBlock?.text || null,
+        const parts = []
+        for (const b of msg.content) {
+          if (b.type === 'text' && b.text?.trim()) parts.push({ text: b.text })
+          else if (b.type === 'tool_use') {
+            parts.push({ functionCall: { name: b.name, args: b.input || {} } })
+          }
         }
-        if (toolBlocks.length) {
-          groqMsg.tool_calls = toolBlocks.map(b => ({
-            id:   b.id,
-            type: 'function',
-            function: { name: b.name, arguments: JSON.stringify(b.input) },
-          }))
-        }
-        result.push(groqMsg)
+        if (parts.length) contents.push({ role: 'model', parts })
       } else if (msg.role === 'user') {
         const toolResults = msg.content.filter(b => b.type === 'tool_result')
-        for (const tr of toolResults) {
-          result.push({
-            role:         'tool',
-            tool_call_id: tr.tool_use_id,
-            content:      String(tr.content || tr.result || ''),
-          })
+        if (toolResults.length) {
+          const parts = toolResults.map(tr => ({
+            functionResponse: {
+              name:     toolIdToName[tr.tool_use_id] || 'unknown',
+              response: { result: String(tr.content || tr.result || '') },
+            },
+          }))
+          contents.push({ role: 'user', parts })
         }
       }
     }
   }
-  return result
+  return contents
 }
 
-// ── Normalización respuesta Groq → formato interno ─────────────
-function normalizeGroqResponse(data) {
-  const choice = data.choices?.[0]
-  if (!choice) return { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Sin respuesta del modelo.' }] }
-
-  const msg          = choice.message
-  const finishReason = choice.finish_reason
-
-  if (finishReason === 'tool_calls' && msg.tool_calls?.length) {
-    const content = []
-    if (msg.content) content.push({ type: 'text', text: msg.content })
-    for (const tc of msg.tool_calls) {
-      let input = {}
-      try { input = JSON.parse(tc.function.arguments) } catch (_) {}
-      content.push({ type: 'tool_use', id: tc.id, name: tc.function.name, input })
-    }
-    return { stop_reason: 'tool_use', content }
+// ── Normalización respuesta Gemini → formato interno ───────────
+function normalizeGeminiResponse(data) {
+  const candidate = data.candidates?.[0]
+  if (!candidate) {
+    return { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Sin respuesta del modelo.' }] }
   }
 
-  return { stop_reason: 'end_turn', content: [{ type: 'text', text: msg.content || '' }] }
+  // Filtrar partes de "thinking" que Gemini 2.5 puede incluir
+  const parts    = (candidate.content?.parts || []).filter(p => !p.thought)
+  const content  = []
+  let hasTool    = false
+  let idCounter  = 0
+
+  for (const part of parts) {
+    if (part.functionCall) {
+      hasTool = true
+      content.push({
+        type:  'tool_use',
+        id:    `gcall_${idCounter++}_${part.functionCall.name}`,
+        name:  part.functionCall.name,
+        input: part.functionCall.args || {},
+      })
+    } else if (part.text) {
+      content.push({ type: 'text', text: part.text })
+    }
+  }
+
+  if (!content.length) content.push({ type: 'text', text: '' })
+
+  return { stop_reason: hasTool ? 'tool_use' : 'end_turn', content }
 }
 
 function buildSystemPrompt(ctx, hasCalendar = false) {
@@ -269,65 +266,85 @@ Nunca creés nada basándote en suposiciones.
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const key = process.env.GROQ_API_KEY
-  if (!key) return res.status(500).json({ error: 'GROQ_API_KEY no configurada en Vercel' })
+  const key = process.env.GEMINI_API_KEY
+  if (!key) return res.status(500).json({ error: 'GEMINI_API_KEY no configurada en Vercel' })
 
   const { messages, context, assistant_content, tool_results, gcal_token } = req.body
 
-  // Convertir mensajes al formato Groq
-  let groqMessages = toGroqMessages(messages)
+  // Recortar historial y asegurarse de que empiece en un mensaje de usuario
+  const raw          = (messages || []).slice(-MAX_HISTORY)
+  const firstUserIdx = raw.findIndex(m => m.role === 'user')
+  const trimmed      = firstUserIdx > 0 ? raw.slice(firstUserIdx) : raw
 
-  // Si viene de una continuación post-tool-use, agregar el intercambio
+  let contents = toGeminiContents(trimmed)
+
+  // Continuación post-tool-use: agregar turno del modelo + resultados de herramientas
   if (assistant_content && tool_results?.length) {
+    const toolIdToName = {}
+    for (const b of assistant_content) {
+      if (b.type === 'tool_use' && b.id && b.name) toolIdToName[b.id] = b.name
+    }
+
+    const modelParts = []
     const textBlock  = assistant_content.find(b => b.type === 'text')
-    const toolBlocks = assistant_content.filter(b => b.type === 'tool_use')
-    const assistantMsg = {
-      role:    'assistant',
-      content: textBlock?.text || null,
+    if (textBlock?.text?.trim()) modelParts.push({ text: textBlock.text })
+    for (const b of assistant_content.filter(b => b.type === 'tool_use')) {
+      modelParts.push({ functionCall: { name: b.name, args: b.input || {} } })
     }
-    if (toolBlocks.length) {
-      assistantMsg.tool_calls = toolBlocks.map(b => ({
-        id:   b.id,
-        type: 'function',
-        function: { name: b.name, arguments: JSON.stringify(b.input) },
-      }))
-    }
-    groqMessages.push(assistantMsg)
-    for (const tr of tool_results) {
-      groqMessages.push({
-        role:         'tool',
-        tool_call_id: tr.tool_use_id,
-        content:      String(tr.result),
-      })
-    }
+    if (modelParts.length) contents.push({ role: 'model', parts: modelParts })
+
+    const resultParts = tool_results.map(tr => ({
+      functionResponse: {
+        name:     toolIdToName[tr.tool_use_id] || tr.tool_use_id,
+        response: { result: String(tr.result) },
+      },
+    }))
+    contents.push({ role: 'user', parts: resultParts })
+  }
+
+  const toolDecls = gcal_token
+    ? [...TASK_TOOL_DECLS, ...GCAL_TOOL_DECLS]
+    : TASK_TOOL_DECLS
+
+  const geminiBody = {
+    system_instruction: { parts: [{ text: buildSystemPrompt(context, !!gcal_token) }] },
+    contents,
+    tools: [{ function_declarations: toolDecls }],
+    tool_config: { function_calling_config: { mode: 'AUTO' } },
+    generation_config: { max_output_tokens: 1024, temperature: 0.3 },
+  }
+
+  const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`
+
+  async function callGemini() {
+    return fetch(GEMINI_URL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(geminiBody),
+    })
   }
 
   try {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method:  'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        model:       'llama-3.3-70b-versatile',
-        max_tokens:  1024,
-        temperature: 0.3,
-        messages: [
-          { role: 'system', content: buildSystemPrompt(context, !!gcal_token) },
-          ...groqMessages,
-        ],
-        tools:       gcal_token ? [...TOOLS, ...GCAL_TOOLS] : TOOLS,
-        tool_choice: 'auto',
-      }),
-    })
+    let response = await callGemini()
+
+    // Reintentar una vez ante rate limit
+    if (response.status === 429) {
+      await new Promise(r => setTimeout(r, 3000))
+      response = await callGemini()
+      if (response.status === 429) {
+        return res.status(200).json({
+          stop_reason: 'end_turn',
+          content: [{ type: 'text', text: 'Hay muchas solicitudes en este momento. Esperá unos segundos y volvé a intentarlo.' }],
+        })
+      }
+    }
 
     const data = await response.json()
     if (!response.ok) {
-      const msg = data?.error?.message || (typeof data?.error === 'string' ? data.error : null) || JSON.stringify(data)
+      const msg = data?.error?.message || JSON.stringify(data)
       return res.status(response.status).json({ error: msg })
     }
-    res.json(normalizeGroqResponse(data))
+    res.json(normalizeGeminiResponse(data))
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
