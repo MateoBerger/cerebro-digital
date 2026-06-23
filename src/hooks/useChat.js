@@ -55,6 +55,31 @@ function toolLabel(name) {
   return labels[name] || 'Ejecutando acción…'
 }
 
+// Formatea rango de evento en zona Chile con día de la semana derivado del código (no del modelo)
+function fmtEventRange(startIso, endIso) {
+  const TZ = 'America/Santiago'
+  const isAllDay = startIso && startIso.length === 10  // "YYYY-MM-DD" sin hora
+
+  if (isAllDay) {
+    // T12:00:00 evita que DST haga cruzar la medianoche y cambie el día
+    const d  = new Date(startIso + 'T12:00:00')
+    const wd = d.toLocaleDateString('es-CL', { timeZone: TZ, weekday: 'long' })
+    const dt = d.toLocaleDateString('es-CL', { timeZone: TZ, day: '2-digit', month: '2-digit' })
+    return `${wd} ${dt} (todo el día)`
+  }
+
+  const ds = new Date(startIso)
+  const de = endIso ? new Date(endIso) : null
+  if (isNaN(ds.getTime())) return startIso
+
+  const wd = ds.toLocaleDateString('es-CL', { timeZone: TZ, weekday: 'long' })
+  const dt = ds.toLocaleDateString('es-CL', { timeZone: TZ, day: '2-digit', month: '2-digit' })
+  const t1 = ds.toLocaleTimeString('es-CL', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false })
+  const t2 = de ? de.toLocaleTimeString('es-CL', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false }) : ''
+
+  return t2 ? `${wd} ${dt} ${t1}–${t2}` : `${wd} ${dt} ${t1}`
+}
+
 // Texto amigable para el chip de resultado — nunca expone IDs internos ni texto crudo
 function toolResultUiText(name, result) {
   if (name === 'listar_eventos_calendario') {
@@ -170,11 +195,12 @@ export function useChat(uid) {
         )
         if (!events.length) return 'No hay eventos en ese rango de fechas'
         return `${events.length} evento(s):\n` + events.map((e, i) => {
-          const start = e.start?.dateTime || e.start?.date || ''
-          const end   = e.end?.dateTime   || e.end?.date   || ''
-          const desc  = e.description ? ` | nota: ${e.description}` : ''
-          // eventId con comillas para que el modelo lo copie literal
-          return `${i + 1}. eventId="${e.id}" | "${e.summary || '(sin título)'}" | ${start} → ${end}${desc}`
+          const startIso = e.start?.dateTime || e.start?.date || ''
+          const endIso   = e.end?.dateTime   || e.end?.date   || ''
+          // Día de la semana calculado en código, nunca dejado al modelo
+          const cuando = fmtEventRange(startIso, endIso)
+          const desc   = e.description ? ` | nota: ${e.description}` : ''
+          return `${i + 1}. eventId="${e.id}" | "${e.summary || '(sin título)'}" | ${cuando}${desc}`
         }).join('\n')
       }
 
