@@ -332,30 +332,58 @@ export default async function handler(req, res) {
     })
   }
 
+  async function readJson(r) {
+    const t = await r.text()
+    try { return JSON.parse(t) } catch { return { raw: t } }
+  }
+
   async function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
+
+  // Clasifica el 429: 'daily' si la cuota del día se agotó, 'minute' si es RPM
+  function quota429Type(data) {
+    const msg = (data?.error?.message || data?.error?.status || '').toLowerCase()
+    if (msg.includes('per day') || msg.includes('daily') || msg.includes('quota_exceeded')) return 'daily'
+    return 'minute'
+  }
 
   try {
     let response = await callGemini()
+    console.log('[chat] status:', response.status)
 
-    // Reintentar ante rate limit: 500 ms → 2 s → mensaje amable
     if (response.status === 429) {
+      // Leer el cuerpo UNA SOLA VEZ para saber qué tipo de límite es
+      const data429    = await readJson(response)
+      const retryAfter = response.headers.get('retry-after') || response.headers.get('Retry-After')
+      console.error('[chat] 429 body:', JSON.stringify(data429).slice(0, 800), '| retry-after:', retryAfter)
+
+      if (quota429Type(data429) === 'daily') {
+        // Cuota diaria agotada — no tiene sentido reintentar hasta el día siguiente
+        return res.status(200).json({
+          stop_reason: 'end_turn',
+          content: [{ type: 'text', text: 'Se agotó la cuota diaria de la API de Google. El servicio se restablece a las 00:00 UTC. Mientras tanto podés usar la sección PAES.' }],
+          _diag: { quota: 'daily', google_error: data429?.error },
+        })
+      }
+
+      // Límite por minuto — reintentar: 500 ms → 2 s
       await sleep(500)
       response = await callGemini()
-    }
-    if (response.status === 429) {
-      await sleep(2000)
-      response = await callGemini()
-    }
-    if (response.status === 429) {
-      return res.status(200).json({
-        stop_reason: 'end_turn',
-        content: [{ type: 'text', text: 'Estoy un poco saturado en este momento. Esperá unos segundos y volvé a intentarlo.' }],
-      })
+      if (response.status === 429) {
+        await sleep(2000)
+        response = await callGemini()
+      }
+      if (response.status === 429) {
+        const d = await readJson(response)
+        console.error('[chat] 429 persists after retries:', JSON.stringify(d).slice(0, 400))
+        return res.status(200).json({
+          stop_reason: 'end_turn',
+          content: [{ type: 'text', text: 'Estoy un poco saturado en este momento. Esperá unos segundos y volvé a intentarlo.' }],
+          _diag: { quota: 'minute', google_error: d?.error },
+        })
+      }
     }
 
-    const rawText = await response.text()
-    let data
-    try { data = JSON.parse(rawText) } catch { data = { raw: rawText } }
+    const data = await readJson(response)
 
     if (!response.ok) {
       console.error('[chat] Google error', response.status, JSON.stringify(data).slice(0, 600))
