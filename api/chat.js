@@ -345,6 +345,15 @@ export default async function handler(req, res) {
     return msg.includes('per day') || msg.includes('daily') || (msg.includes('token') && msg.includes('limit'))
   }
 
+  // Log estructura del payload (sin contenido sensible)
+  console.log('[chat] groqBody diag: model=%s | msgs=%d | tools=%d | has_tool_results=%s',
+    groqBody.model,
+    groqBody.messages.length,
+    (groqBody.tools || []).length,
+    !!(tool_results?.length)
+  )
+  console.log('[chat] msg roles:', groqBody.messages.map(m => m.role).join(','))
+
   try {
     let response = await callGroq()
     console.log('[chat] Groq status:', response.status)
@@ -394,8 +403,14 @@ export default async function handler(req, res) {
 
     const data = await readJson(response)
     if (!response.ok) {
-      console.error('[chat] Groq error', response.status, JSON.stringify(data).slice(0, 600))
-      return res.status(response.status).json({ error: `Groq ${response.status}`, groq_error: data?.error || data })
+      const errMsg = data?.error?.message || data?.error?.code || JSON.stringify(data).slice(0, 400)
+      console.error('[chat] Groq error', response.status, JSON.stringify(data))
+      // Devolver 200 con mensaje visible en la UI para poder depurar sin acceso a Vercel logs
+      return res.status(200).json({
+        stop_reason: 'end_turn',
+        content: [{ type: 'text', text: `⚠️ Groq ${response.status}: ${errMsg}` }],
+        _diag: { status: response.status, groq_error: data?.error || data },
+      })
     }
     res.json(normalizeGroqResponse(data))
   } catch (err) {
