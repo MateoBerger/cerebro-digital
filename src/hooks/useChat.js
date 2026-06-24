@@ -340,7 +340,13 @@ export function useChat(uid) {
               result = 'Evento ya eliminado'
             } else {
               if (eid) seenBorrar.add(eid)
-              result = await executeTool(block.name, block.input)
+              try {
+                result = await executeTool(block.name, block.input)
+              } catch (borrarErr) {
+                // Capturamos errores individuales para no abortar los borrados restantes
+                console.error('[GCal] Error en borrar_evento_calendario:', eid, borrarErr.message)
+                result = `Error al borrar: ${borrarErr.message.slice(0, 80)}`
+              }
             }
           } else {
             result = await executeTool(block.name, block.input)
@@ -349,16 +355,24 @@ export function useChat(uid) {
           toolResults.push({ tool_use_id: block.id, result })
         }
 
-        // Si el turno fue solo borrado(s) exitosos, el mensaje de cierre se genera
-        // localmente para evitar la llamada extra que topa el rate limit.
-        const soloBorradosExitosos =
-          toolBlocks.length > 0 &&
-          toolBlocks.every(b => b.name === 'borrar_evento_calendario') &&
-          toolResults.every(tr => tr.result.includes('eliminado'))
+        // Si el turno fue solo borrado(s), generar el cierre localmente con conteo real.
+        const allBorrar = toolBlocks.length > 0 && toolBlocks.every(b => b.name === 'borrar_evento_calendario')
 
         let finalText = ''
-        if (soloBorradosExitosos) {
-          finalText = 'Listo, el evento fue eliminado del calendario.'
+        if (allBorrar) {
+          const total     = toolBlocks.length
+          const succeeded = toolResults.filter(tr => tr.result.includes('eliminado')).length
+          const failed    = total - succeeded
+
+          if (total === 1 && succeeded === 1) {
+            finalText = 'Listo, el evento fue eliminado del calendario.'
+          } else if (failed === 0) {
+            finalText = `Listo, cancelé ${total} eventos del calendario.`
+          } else if (succeeded === 0) {
+            finalText = `No se pudo borrar ninguno de los ${total} eventos. Revisá la conexión con Google Calendar.`
+          } else {
+            finalText = `Cancelé ${succeeded} de ${total} eventos. ${failed} no se pu${failed === 1 ? 'do' : 'dieron'} borrar.`
+          }
           pushUi({ id: `a2-${Date.now()}`, role: 'assistant', text: finalText })
         } else {
           const r2 = await fetch('/api/chat', {

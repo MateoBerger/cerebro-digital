@@ -68,7 +68,20 @@ export async function gcalActualizarEvento(token, eventId, form, dayDate) {
 }
 
 export async function gcalEliminarEvento(token, eventId) {
-  return req(token, `${BASE}/${encodeURIComponent(eventId)}`, { method: 'DELETE' })
+  const url = `${BASE}/${encodeURIComponent(eventId)}`
+  if (!token) throw Object.assign(new Error('No hay token de Google Calendar'), { code: 'no_token' })
+  const res = await fetch(url, {
+    method:  'DELETE',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+  })
+  console.log('[gcal] DELETE', eventId.slice(-32), '→ HTTP', res.status, res.ok ? '✓' : '✗')
+  if (res.status === 401) throw Object.assign(new Error('Token de Google Calendar expirado'), { code: 'token_expired' })
+  if (res.status === 404 || res.status === 410) return null  // ya borrado → éxito
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`Google Calendar API ${res.status}: ${body.slice(0, 200)}`)
+  }
+  return null  // 204 = borrado correctamente
 }
 
 export async function gcalGetEvento(token, eventId) {

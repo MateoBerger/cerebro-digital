@@ -235,17 +235,28 @@ ${hasCalendar ? `
 Conectado. Cuando Mateo pregunte por el calendario usá listar_eventos_calendario con el rango apropiado. No respondas "no tenés nada" sin haber consultado primero.
 
 FLUJO PARA BORRAR O EDITAR (seguilo internamente sin explicarlo al usuario):
-1. Ante "borrá X" / "editá X": llamá listar_eventos_calendario de inmediato con el rango correcto. NO digas "voy a buscar", "primero necesito el ID", "déjame consultar el calendario" ni nada similar. Simplemente llamá la herramienta.
-2. Con los resultados, pedí confirmación natural (solo título y fecha/hora). Ejemplo: "¿Cancelo 'Clases de Inglés' del sábado 27 de 8:00 a 13:20?"
-3. Con el "sí" de Mateo, ejecutá borrar_evento_calendario o editar_evento_calendario.
+1. Ante "borrá X" / "editá X" / "cancelá todo": llamá listar_eventos_calendario de inmediato con el rango correcto. NO digas nada antes de llamar la herramienta.
+
+2. Con los resultados — CONFIRMACIÓN (OBLIGATORIA, diferente según cantidad):
+   - 1 evento: pedí confirmación breve. Ej: "¿Cancelo 'Inglés' del sábado 27 de 8:00 a 13:20?"
+   - MÚLTIPLES eventos: listá CADA evento con título y horario ANTES de pedir confirmación:
+     "¿Cancelo estos N eventos?\n- 'Título 1' — lunes 23/06 08:00–09:00\n- 'Título 2' — martes 24/06 10:00–11:00\n...\n¿Confirmar?"
+     NUNCA resumás con "los N eventos de la semana" sin listar cada uno. Mostrá el listado completo.
+
+3. Con el "sí" de Mateo:
+   - 1 evento → 1 llamada a borrar_evento_calendario.
+   - N eventos → N llamadas a borrar_evento_calendario en la MISMA respuesta (tool calls paralelos).
+     Si hay 24 eventos para borrar, tu respuesta debe incluir exactamente 24 tool calls de borrar_evento_calendario, cada una con el eventId de ese evento.
+     NUNCA borres solo 1 cuando hay que borrar N. Copiá el eventId EXACTO de cada evento del listado.
 
 REGLAS DE IDs:
-- NUNCA inventes ni construyas un eventId. Solo podés usar eventIds recibidos como resultado de listar_eventos_calendario.
+- NUNCA inventes ni construyas un eventId. Solo podés usar eventIds recibidos como resultado de listar_eventos_calendario en ese mismo turno.
 - Copiá el eventId LITERAL, sin modificar ni truncar ni un carácter.
 - El eventId es INTERNO. Jamás lo menciones al usuario.
 
 DESPUÉS DE BORRAR:
-- No hace falta un párrafo de cierre elaborado. La app muestra "Evento eliminado" en el chip. Si querés decir algo, una frase corta está bien, pero no es obligatorio.` : ''}
+- El frontend genera automáticamente el mensaje con el conteo real (ej: "Cancelé 24 de 24 eventos").
+- No agregues texto de cierre; la app lo maneja sola.` : ''}
 ## Estado PAES (resumen)
 ${ctx.paes}
 
