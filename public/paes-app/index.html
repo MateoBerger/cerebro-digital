@@ -2591,6 +2591,8 @@ async function procesarEnsayo(){
   const BLOCK=18;
   let allExtracted=[];
   let emptyBlocks=0;
+  const bloquesFallidos=[];
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
   const setLog=(msg,pct)=>{
     if(logEl)logEl.textContent=msg;
@@ -2598,7 +2600,7 @@ async function procesarEnsayo(){
   };
 
   setLog(`Clave: ${claveMap.size} entradas (preg. ${minQ}–${maxQ}). Iniciando extracción...`,5);
-  await new Promise(r=>setTimeout(r,200));
+  await sleep(300);
 
   const SYS=`Eres un extractor de preguntas de ensayos PAES chilenos a partir de texto markitdown.
 
@@ -2617,39 +2619,80 @@ REGLAS ESTRICTAS:
 Formato por objeto:
 {"numero":1,"stem":"enunciado","options":["alt A","alt B","alt C","alt D"],"grafico":false}`;
 
+  // Backoff delays for 429 retries: 5 s → 12 s → 25 s
+  const BACKOFF=[5000,12000,25000];
+  const INTER_BLOCK=4500; // pause between successful blocks
+
   for(let start=minQ;start<=maxQ;start+=BLOCK){
     const end=Math.min(start+BLOCK-1,maxQ);
     const pct=Math.round(((start-minQ)/(maxQ-minQ+1))*80)+10;
     setLog(`Procesando preguntas ${start}–${end}...`,pct);
 
-    try{
-      const resp=await fetch('/api/paes-ai',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          system:SYS.replace('BLOCK_START',start).replace('BLOCK_END',end),
-          messages:[{role:'user',content:`TEXTO:\n\n${texto}\n\n---\nExtrae preguntas ${start}–${end}. Solo array JSON.`}]
-        })
-      });
-      if(resp.status===429){setLog('⚠️ Límite API. Guardando progreso...',pct);break;}
-      if(!resp.ok)throw new Error(`HTTP ${resp.status}`);
-      const data=await resp.json();
-      let raw=(data.text||'').trim();
-      const mj=raw.match(/\[[\s\S]*\]/);if(mj)raw=mj[0];
-      const parsed=JSON.parse(raw);
-      if(!Array.isArray(parsed)||!parsed.length){emptyBlocks++;if(emptyBlocks>=2)break;continue;}
-      emptyBlocks=0;
-      const valid=parsed.filter(q=>
-        q&&typeof q.numero==='number'&&typeof q.stem==='string'&&
-        Array.isArray(q.options)&&q.options.length===4
-      );
-      allExtracted=allExtracted.concat(valid);
-      const matched=valid.filter(q=>!q.grafico&&claveMap.has(q.numero)).length;
-      setLog(`✓ ${allExtracted.length} preg. extraídas · ${matched} con clave en este bloque`,pct);
-    }catch(e){
-      setLog(`⚠️ Error bloque ${start}-${end} (${e.message}). Continuando...`,pct);
+    const payload=JSON.stringify({
+      system:SYS.replace('BLOCK_START',start).replace('BLOCK_END',end),
+      messages:[{role:'user',content:`TEXTO:\n\n${texto}\n\n---\nExtrae preguntas ${start}–${end}. Solo array JSON.`}]
+    });
+
+    let bloqueOk=false;
+    for(let intento=0;intento<=BACKOFF.length;intento++){
+      try{
+        const resp=await fetch('/api/paes-ai',{method:'POST',headers:{'Content-Type':'application/json'},body:payload});
+
+        if(resp.status===429){
+          if(intento<BACKOFF.length){
+            const w=BACKOFF[intento];
+            setLog(`⏳ Rate limit — esperando ${w/1000}s antes de reintentar preg. ${start}–${end} (intento ${intento+1}/${BACKOFF.length})...`,pct);
+            await sleep(w);
+            continue; // retry
+          }
+          // exhausted retries
+          bloquesFallidos.push(`${start}–${end}`);
+          setLog(`⚠️ Preg. ${start}–${end}: sin respuesta tras ${BACKOFF.length} reintentos (429). Continuando con siguiente bloque.`,pct);
+          bloqueOk=true; // don't retry further, move on
+          break;
+        }
+
+        if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data=await resp.json();
+        let raw=(data.text||'').trim();
+        const mj=raw.match(/\[[\s\S]*\]/);if(mj)raw=mj[0];
+        const parsed=JSON.parse(raw);
+
+        if(!Array.isArray(parsed)||!parsed.length){
+          emptyBlocks++;
+          bloqueOk=true;
+          break;
+        }
+        emptyBlocks=0;
+        const valid=parsed.filter(q=>
+          q&&typeof q.numero==='number'&&typeof q.stem==='string'&&
+          Array.isArray(q.options)&&q.options.length===4
+        );
+        allExtracted=allExtracted.concat(valid);
+        const matched=valid.filter(q=>!q.grafico&&claveMap.has(q.numero)).length;
+        setLog(`✓ Preg. ${start}–${end}: ${valid.length} extraídas, ${matched} con clave. Total: ${allExtracted.length}.`,pct);
+        bloqueOk=true;
+        break;
+
+      }catch(e){
+        if(intento<BACKOFF.length){
+          const w=BACKOFF[intento];
+          setLog(`⚠️ Error preg. ${start}–${end} (${e.message}). Reintentando en ${w/1000}s...`,pct);
+          await sleep(w);
+        }else{
+          bloquesFallidos.push(`${start}–${end}`);
+          setLog(`⚠️ Preg. ${start}–${end} descartado tras reintentos: ${e.message}`,pct);
+          bloqueOk=true;
+        }
+      }
     }
-    if(start+BLOCK<=maxQ)await new Promise(r=>setTimeout(r,600));
+
+    if(emptyBlocks>=2)break; // no more questions in this direction
+
+    if(bloqueOk&&start+BLOCK<=maxQ){
+      setLog(`Esperando ${INTER_BLOCK/1000}s para no saturar la IA... (siguiente: preg. ${start+BLOCK}–${Math.min(start+2*BLOCK-1,maxQ)})`,pct);
+      await sleep(INTER_BLOCK);
+    }
   }
 
   btns.forEach(b=>{if(b)b.disabled=false;});
@@ -2689,7 +2732,7 @@ Formato por objeto:
     nombre,prueba,
     fecha:new Date().toLocaleDateString('es-CL'),
     preguntas:finalQuestions,
-    stats:{extraidas:allExtracted.length,omitidosGrafico,omitidosSinClave}
+    stats:{extraidas:allExtracted.length,omitidosGrafico,omitidosSinClave,bloquesFallidos}
   };
   state.ensayosSubidos.push(ensayo);
   saveState();
@@ -2728,6 +2771,7 @@ Formato por objeto:
           <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">En clavijero</div>
         </div>
       </div>
+      ${bloquesFallidos.length?`<div style="font-size:12px;color:var(--red);margin-bottom:6px">❌ Bloques no procesados por rate limit: preg. <strong>${bloquesFallidos.join(', ')}</strong></div>`:''}
       ${omitidosGrafico.length?`<div style="font-size:12px;color:var(--yellow);margin-bottom:6px">🖼 Omitidas por gráfico/imagen: <strong>${omitidosGrafico.join(', ')}</strong></div>`:''}
       ${omitidosSinClave.length?`<div style="font-size:12px;color:var(--text3);margin-bottom:10px">📋 Sin entrada en clavijero: ${omitidosSinClave.join(', ')}</div>`:''}
       <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:10px">Vista previa (primeras ${prev.length})</div>
