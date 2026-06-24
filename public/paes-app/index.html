@@ -5,32 +5,34 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PAES·PRO — Plataforma de Preparación</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <style>
 :root{--bg:#0a0c10;--surface:#13161d;--surface2:#1a1e28;--border:#252a38;--accent:#4f7cff;--accent2:#7c4fff;--accent3:#ff6b4f;--green:#2dcc7e;--red:#ff4f6b;--yellow:#ffcc4f;--text:#e8eaf2;--text2:#8891a8;--text3:#4a5268;--glow:rgba(79,124,255,0.15);--radius:14px;--radius-sm:8px;--font-head:'Syne',sans-serif;--font-body:'DM Sans',sans-serif;}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:15px;line-height:1.6;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:15px;line-height:1.6;min-height:100vh;display:flex;overflow-x:hidden;}
+.sidebar{width:240px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;left:0;top:0;bottom:0;z-index:100;transition:transform .3s ease;}
+.sidebar-logo{padding:24px 24px 16px;border-bottom:1px solid var(--border);}
+.sidebar-logo h1{font-family:var(--font-head);font-size:22px;font-weight:800;letter-spacing:-0.5px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.sidebar-logo p{font-size:11px;color:var(--text3);margin-top:2px;font-weight:500;letter-spacing:1px;text-transform:uppercase;}
+.byline{font-size:11px;color:var(--accent2);margin-top:5px;font-weight:600;letter-spacing:.5px;-webkit-text-fill-color:var(--accent2);}
+.streak-bar{margin:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;display:flex;align-items:center;gap:10px;}
+.streak-icon{font-size:22px;}.streak-info{flex:1;}
+.streak-info .s-num{font-family:var(--font-head);font-size:18px;font-weight:700;color:var(--yellow);}
+.streak-info .s-lbl{font-size:11px;color:var(--text3);}
+nav{padding:8px 0;flex:1;overflow-y:auto;}
+.nav-section{padding:12px 16px 4px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);font-weight:600;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;color:var(--text2);cursor:pointer;transition:all .2s;font-size:14px;font-weight:400;border-left:3px solid transparent;}
+.nav-item:hover{background:var(--surface2);color:var(--text);}
+.nav-item.active{background:var(--glow);color:var(--accent);border-left-color:var(--accent);font-weight:500;}
+.nav-icon{width:18px;text-align:center;font-size:16px;}
+.sidebar-footer{padding:16px;border-top:1px solid var(--border);}
+.user-pill{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border-radius:var(--radius-sm);cursor:pointer;}
 .avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;}
-.user-name{font-size:12px;font-weight:500;}
-/* Top tab bar */
-.top-tab-bar{display:flex;align-items:center;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;height:46px;overflow-x:auto;padding:0 4px;gap:0;scrollbar-width:none;}
-.top-tab-bar::-webkit-scrollbar{height:0;}
-.tab-nav-btn{display:inline-flex;align-items:center;gap:5px;padding:0 16px;height:46px;background:none;border:none;border-bottom:2.5px solid transparent;color:var(--text2);font-family:var(--font-body);font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;transition:all .2s;flex-shrink:0;}
-.tab-nav-btn:hover{color:var(--text);}
-.tab-nav-btn.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
-.top-streak{margin-left:auto;display:flex;align-items:center;gap:5px;padding:0 18px;font-family:var(--font-head);font-size:17px;font-weight:700;color:var(--yellow);white-space:nowrap;flex-shrink:0;}
-/* Content layout */
-.content-wrap{display:flex;flex:1;overflow:hidden;}
-.mini-sidebar{width:176px;background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column;scrollbar-width:thin;}
-.mini-nav-section{padding:12px 14px 4px;font-size:9.5px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);font-weight:600;}
-.mini-nav-item{display:flex;align-items:center;gap:8px;padding:9px 16px;color:var(--text2);cursor:pointer;font-size:13px;font-weight:400;border-left:3px solid transparent;transition:all .15s;}
-.mini-nav-item:hover{background:var(--surface2);color:var(--text);}
-.mini-nav-item.active{background:var(--glow);color:var(--accent);border-left-color:var(--accent);font-weight:500;}
-.mini-user{margin-top:auto;padding:12px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;background:var(--surface2);border-radius:var(--radius-sm);margin:auto 10px 10px;}
-.page-container{flex:1;overflow-y:auto;}
-.page{display:none;padding:28px 32px;max-width:1100px;}
+.user-name{font-size:13px;font-weight:500;}
+.main{margin-left:240px;flex:1;min-height:100vh;display:flex;flex-direction:column;}
+.topbar{padding:18px 32px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface);position:sticky;top:0;z-index:50;}
+.topbar-title{font-family:var(--font-head);font-size:18px;font-weight:700;}
+.topbar-actions{display:flex;gap:10px;align-items:center;}
+.page{display:none;padding:28px 32px;flex:1;max-width:1100px;}
 .page.active{display:block;}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;transition:border-color .2s;}
 .card:hover{border-color:var(--accent);}
@@ -173,7 +175,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 ::-webkit-scrollbar{width:6px;}::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 ::-webkit-scrollbar-thumb:hover{background:var(--text3);}
-@media(max-width:768px){.mini-sidebar{width:140px;}.home-grid{grid-template-columns:1fr;}.essay-layout{grid-template-columns:1fr;}.page{padding:16px 14px;}.tab-nav-btn{padding:0 10px;font-size:12px;}}
+@media(max-width:768px){.sidebar{transform:translateX(-100%);}.sidebar.open{transform:translateX(0);}.main{margin-left:0;}.home-grid{grid-template-columns:1fr;}.essay-layout{grid-template-columns:1fr;}.page{padding:20px 16px;}}
 .divider{border:none;border-top:1px solid var(--border);margin:24px 0;}
 .w-full{width:100%;}.hidden{display:none!important;}
 .book-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;transition:border-color .2s;}
@@ -211,41 +213,59 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 </style>
 </head>
 <body>
-<!-- Top tab navigation -->
-<nav class="top-tab-bar">
-  <button class="tab-nav-btn active" data-page="home" onclick="navigate('home')">🏠 Inicio</button>
-  <button class="tab-nav-btn" data-page="progress" onclick="navigate('progress')">📊 Mi Progreso</button>
-  <button class="tab-nav-btn" data-page="dato" onclick="navigate('dato')">🧠 Dato del Día</button>
-  <button class="tab-nav-btn" data-page="practice" onclick="navigate('practice')">✏️ Práctica Rápida</button>
-  <button class="tab-nav-btn" data-page="vocab" onclick="navigate('vocab')">📖 Vocabulario PAES</button>
-  <button class="tab-nav-btn" data-page="mathTips" onclick="navigate('mathTips')">💡 Tips Matemáticas</button>
-  <div class="top-streak">🔥 <span id="streakCount">0</span></div>
-</nav>
-
-<!-- Content wrap -->
-<div class="content-wrap">
-  <!-- Mini sidebar -->
-  <aside class="mini-sidebar">
-    <div class="mini-nav-section">Estudio</div>
-    <div class="mini-nav-item" data-page="guides" onclick="navigate('guides')">📚 Guías</div>
-    <div class="mini-nav-item" data-page="errors" onclick="navigate('errors')">🎯 Mis Errores</div>
-    <div class="mini-nav-section">Habilidades</div>
-    <div class="mini-nav-item" data-page="wordbank" onclick="navigate('wordbank')">🔍 Banco de Palabras</div>
-    <div class="mini-nav-section">Evaluación</div>
-    <div class="mini-nav-item" data-page="essays" onclick="navigate('essays')">📝 Ensayos</div>
-    <div class="mini-nav-item" data-page="upload" onclick="navigate('upload')">📤 Subir Guía</div>
-    <div class="mini-nav-item" data-page="download" onclick="navigate('download')">⬇️ Descargar PDF</div>
-    <div class="mini-nav-section">Personal</div>
-    <div class="mini-nav-item" data-page="books" onclick="navigate('books')">📕 Mis Libros</div>
-    <div class="mini-nav-item hidden" id="adminNavItem" data-page="admin" onclick="navigate('admin')">👑 Admin</div>
-    <div class="mini-user">
-      <div class="avatar" id="avatarInitial">M</div>
-      <div class="user-name" id="userName">Mateo</div>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <h1>PAES·PRO</h1>
+    <p>Plataforma de Estudio</p>
+    <div class="byline">✦ By Mateo Berger</div>
+  </div>
+  <div class="streak-bar">
+    <span class="streak-icon">🔥</span>
+    <div class="streak-info">
+      <div class="s-num" id="streakCount">0</div>
+      <div class="s-lbl">días de racha</div>
     </div>
-  </aside>
+  </div>
+  <nav>
+    <div class="nav-section">Principal</div>
+    <div class="nav-item active" onclick="navigate('home')"><span class="nav-icon">🏠</span>Inicio</div>
+    <div class="nav-item" onclick="navigate('progress')"><span class="nav-icon">📊</span>Mi Progreso</div>
+    <div class="nav-item" onclick="navigate('dato')"><span class="nav-icon">🧠</span>Dato del Día</div>
+    <div class="nav-section">Estudio</div>
+    <div class="nav-item" onclick="navigate('guides')"><span class="nav-icon">📚</span>Guías de Estudio</div>
+    <div class="nav-item" onclick="navigate('practice')"><span class="nav-icon">✏️</span>Práctica Rápida</div>
+    <div class="nav-item" onclick="navigate('errors')"><span class="nav-icon">🎯</span>Practicar Errores</div>
+    <div class="nav-section">Habilidades</div>
+    <div class="nav-item" onclick="navigate('vocab')"><span class="nav-icon">📖</span>Vocabulario PAES</div>
+    <div class="nav-item" onclick="navigate('wordbank')"><span class="nav-icon">🔍</span>Banco de Palabras</div>
+    <div class="nav-item" onclick="navigate('mathTips')"><span class="nav-icon">💡</span>Tips Matemáticas</div>
+    <div class="nav-section">Evaluación</div>
+    <div class="nav-item" onclick="navigate('essays')"><span class="nav-icon">📝</span>Ensayos</div>
+    <div class="nav-item" onclick="navigate('upload')"><span class="nav-icon">📤</span>Subir Guía</div>
+    <div class="nav-item" onclick="navigate('download')"><span class="nav-icon">⬇️</span>Descargar PDF</div>
+    <div class="nav-section">Personal</div>
+    <div class="nav-item" onclick="navigate('books')"><span class="nav-icon">📕</span>Mis Libros</div>
+    <div class="nav-item admin-only hidden" onclick="navigate('admin')" id="adminNavItem"><span class="nav-icon">👑</span>Admin</div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="user-pill" onclick="promptUserName()">
+      <div class="avatar" id="avatarInitial">E</div>
+      <div class="user-name" id="userName">Estudiante</div>
+    </div>
+  </div>
+</aside>
 
-  <!-- Page container -->
-  <div class="page-container">
+<main class="main">
+  <header class="topbar">
+    <div style="display:flex;align-items:center;gap:14px">
+      <button style="display:none;background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer" id="menuBtn" onclick="toggleSidebar()">☰</button>
+      <span class="topbar-title" id="topbarTitle">Inicio</span>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn btn-primary btn-sm" onclick="navigate('vocab')">🔥 Racha</button>
+      <button class="btn btn-ghost btn-sm" onclick="openGroqKeyModal()">🔑 API Key</button>
+    </div>
+  </header>
 
   <!-- HOME -->
   <section class="page active" id="page-home">
@@ -518,7 +538,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 
   <!-- ADMIN -->
   <section class="page" id="page-admin">
-    <div class="section-header"><h2>👑 Panel de Administrador</h2><p>Acceso exclusivo.</p></div>
+    <div class="section-header"><h2>👑 Panel de Administrador</h2><p>Acceso exclusivo: mateo.berger206@gmail.com</p></div>
     <div class="admin-panel">
       <span class="admin-badge">👑 Admin</span>
       <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin:14px 0 8px">Estadísticas globales</h3>
@@ -526,9 +546,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
     </div>
     <div id="adminContent"></div>
   </section>
-
-  </div><!-- .page-container -->
-</div><!-- .content-wrap -->
+</main>
 
 <!-- WORD LOOKUP TOOLTIP -->
 <div id="wordTooltip" style="position:fixed;display:none;z-index:3000;background:var(--surface);border:1.5px solid var(--accent);border-radius:var(--radius-sm);padding:8px 14px;font-size:12px;box-shadow:0 8px 24px rgba(0,0,0,.5);max-width:260px;pointer-events:auto;">
@@ -864,68 +882,41 @@ questions:[
 ];
 
 // ============================================================
-// FIREBASE INIT & STATE (Firestore-backed)
+// STATE
 // ============================================================
-firebase.initializeApp({
-  apiKey:'AIzaSyDDmMU3siO09lUoBdPVU5dQsOmc2zYIonU',
-  authDomain:'cerebro-digital-39ef5.firebaseapp.com',
-  projectId:'cerebro-digital-39ef5',
-  storageBucket:'cerebro-digital-39ef5.firebasestorage.app',
-  messagingSenderId:'110455411680',
-  appId:'1:110455411680:web:96d08485b5c9bd908dd185'
-});
-
-let _uid=null;
-let _db=null;
-let _saveTimer=null;
-
-function getDefaultState(){
-  return{userName:'Mateo',userEmail:'',streak:0,lastVisit:null,
-    correctAnswers:0,totalAnswers:0,essays:0,
-    errors:[],history:[],
-    vocab:{lastWordDate:null,learnedToday:false,currentPos:0,learnedWords:[],seed:0.5},
-    progress:{},wordBank:[],books:[],uploadedFiles:[],
-    practiceRateLimit:{},seenExIds:new Set()};
-}
-let state=getDefaultState();
+const ADMIN_EMAIL='mateo.berger206@gmail.com';
+let state=JSON.parse(localStorage.getItem('paes_v3')||'null')||{
+  userName:'Estudiante',userEmail:'',streak:0,lastVisit:null,
+  correctAnswers:0,totalAnswers:0,essays:0,
+  errors:[],history:[],
+  vocab:{lastWordDate:null,learnedToday:false,currentPos:0,learnedWords:[],seed:Math.random()},
+  progress:{},wordBank:[],books:[],uploadedFiles:[],
+  practiceRateLimit:{},seenExIds:new Set()
+};
+// Convert seenExIds from array if loaded from JSON
+if(Array.isArray(state.seenExIds)) state.seenExIds=new Set(state.seenExIds);
 
 function saveState(){
-  if(!_uid||!_db)return;
-  clearTimeout(_saveTimer);
-  _saveTimer=setTimeout(async()=>{
-    const toSave={...state,seenExIds:[...state.seenExIds]};
-    try{await _db.collection('users').doc(_uid).collection('paes-app').doc('state').set(toSave);}
-    catch(e){console.error('saveState:',e);}
-  },1500);
+  const toSave={...state,seenExIds:[...state.seenExIds]};
+  localStorage.setItem('paes_v3',JSON.stringify(toSave));
 }
+function isAdmin(){return state.userEmail===ADMIN_EMAIL||state.userName.toLowerCase().includes('mateo berger');}
 
-async function _loadStateFromFirestore(){
-  try{
-    const doc=await _db.collection('users').doc(_uid).collection('paes-app').doc('state').get();
-    if(doc.exists){
-      const loaded=doc.data();
-      state={...getDefaultState(),...loaded};
-    }else{state=getDefaultState();}
-    state.seenExIds=new Set(Array.isArray(state.seenExIds)?state.seenExIds:[]);
-  }catch(e){console.error('loadState:',e);state=getDefaultState();state.seenExIds=new Set();}
+// ============================================================
+// GROQ KEY
+// ============================================================
+function getGroqKey(){return localStorage.getItem('groq_key')||'';}
+function setGroqKey(k){localStorage.setItem('groq_key',k);}
+function openGroqKeyModal(){
+  openModal(`<h2>🔑 API Key de Groq</h2>
+    <p style="color:var(--text2);margin-bottom:16px">Necesitas una API Key gratuita de Groq para usar el asistente IA. Ve a <strong>console.groq.com</strong> y créala.</p>
+    <input id="groqKeyInput" class="ai-input" type="password" style="width:100%;margin-bottom:16px" placeholder="Pega tu API Key aquí (gsk_...)" value="${getGroqKey()}">
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-primary" onclick="saveGroqKey()">Guardar</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+    </div>`);
 }
-
-function isAdmin(){return state.userEmail==='abergeroto@gmail.com'||state.userEmail==='mateo.berger206@gmail.com';}
-
-firebase.auth().onAuthStateChanged(async(user)=>{
-  if(user){
-    _uid=user.uid;_db=firebase.firestore();
-    state.userName=user.displayName?.split(' ')[0]||'Mateo';
-    state.userEmail=user.email||'';
-    await _loadStateFromFirestore();
-    document.getElementById('userName').textContent=state.userName;
-    document.getElementById('avatarInitial').textContent=(state.userName[0]||'M').toUpperCase();
-    if(isAdmin())document.getElementById('adminNavItem').classList.remove('hidden');
-    init();
-  }else{
-    document.body.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0a0c10;color:#8891a8;flex-direction:column;gap:16px;font-family:sans-serif"><div style="font-size:24px">🔒</div><div style="font-size:16px;color:#e8eaf2;font-weight:600">Acceso no autorizado</div><div style="font-size:13px">Iniciá sesión en la app principal para acceder a PAES·PRO.</div></div>`;
-  }
-});
+function saveGroqKey(){const k=document.getElementById('groqKeyInput')?.value.trim();if(k){setGroqKey(k);closeModal();showNotif('API Key guardada','Ya puedes usar el asistente IA','success');}else{showNotif('Error','Ingresa una key válida','error');}}
 
 // ============================================================
 // STREAK & NAVIGATION
@@ -943,11 +934,13 @@ function updateStreak(){
 
 function navigate(page){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.tab-nav-btn,.mini-nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const pageEl=document.getElementById(`page-${page}`);
   if(pageEl)pageEl.classList.add('active');
-  const navEl=document.querySelector(`[data-page="${page}"]`);
+  const navEl=document.querySelector(`.nav-item[onclick="navigate('${page}')"]`);
   if(navEl)navEl.classList.add('active');
+  const titles={home:'Inicio',guides:'Guías',practice:'Práctica Rápida',errors:'Practicar Errores',vocab:'Vocabulario',wordbank:'Banco de Palabras',mathTips:'Tips Matemáticas',dato:'Dato del Día',essays:'Ensayos',progress:'Mi Progreso',books:'Mis Libros',upload:'Subir Guía',download:'Descargar PDF',admin:'Panel Admin','guide-detail':'Guías'};
+  document.getElementById('topbarTitle').textContent=titles[page]||page;
   if(page==='home')renderHome();
   if(page==='guides')renderGuides();
   if(page==='practice')renderPracticeInit();
@@ -1207,6 +1200,8 @@ let aiHistory=[];
 async function sendAI(){
   const input=document.getElementById('aiInputField');
   const msg=input?.value.trim();if(!msg)return;
+  let key=getGroqKey();
+  if(!key){openGroqKeyModal();return;}
   input.value='';
   appendAIMsg(msg,'user');
   const loadId=appendAIMsg('Pensando...','ai');
@@ -1221,18 +1216,22 @@ Explicación: ${currentEx.explanation}`
     :'Eres un tutor experto en PAES chilena 2026. Responde en español, sin LaTeX, sin símbolos matemáticos especiales.';
 
   try{
-    const resp=await fetch('/api/paes-tutor',{
+    const resp=await fetch('https://api.groq.com/openai/v1/chat/completions',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({message:msg,systemPrompt:sysPrompt,history:aiHistory})
+      headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},
+      body:JSON.stringify({
+        model:'llama-3.3-70b-versatile',
+        messages:[{role:'system',content:sysPrompt},...aiHistory,{role:'user',content:msg}],
+        temperature:0.6,max_tokens:700
+      })
     });
-    if(!resp.ok){const e=await resp.json().catch(()=>({}));throw new Error(e.error||`HTTP ${resp.status}`);}
+    if(!resp.ok)throw new Error(`HTTP ${resp.status}`);
     const data=await resp.json();
-    const reply=data.reply||'No pude responder. Intenta de nuevo.';
+    const reply=data.choices?.[0]?.message?.content||'No pude responder. Intenta de nuevo.';
     aiHistory.push({role:'user',content:msg},{role:'assistant',content:reply});
     if(aiHistory.length>12)aiHistory=aiHistory.slice(-12);
     updateAIMsg(loadId,reply);
-  }catch(e){updateAIMsg(loadId,'Error: '+e.message);}
+  }catch(e){updateAIMsg(loadId,'Error: '+e.message+'. Verifica tu API Key de Groq.');}
 }
 
 function appendAIMsg(text,type){
@@ -1287,21 +1286,27 @@ async function lookupSelectedWord(){
   }
 
   // Use AI
+  const key=getGroqKey();
   showNotif('Buscando...','Consultando definición...');
 
+  if(!key){
+    state.wordBank.push({word,def:`Palabra guardada manualmente. Agrega tu API Key para obtener definición automática.`,examples:[],date:new Date().toLocaleDateString('es-CL')});
+    saveState();showNotif('Guardada sin definición',`"${word}" guardada. Agrega tu API Key para definición`);return;
+  }
+
   try{
-    const resp=await fetch('/api/paes-tutor',{
+    const resp=await fetch('https://api.groq.com/openai/v1/chat/completions',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},
       body:JSON.stringify({
-        message:`Define la palabra o concepto "${word}" en español de forma clara y detallada (3-4 líneas). Luego da 2 ejemplos de uso en oraciones completas, relevantes para estudiantes de enseñanza media chilena. Responde SOLO en formato JSON exacto: {"def":"definición detallada","examples":["ejemplo 1","ejemplo 2"]} Sin texto adicional, sin comillas fuera del JSON.`,
-        systemPrompt:'Eres un asistente educativo. Responde SOLO con el JSON solicitado, sin texto adicional.',
-        history:[]
+        model:'llama-3.3-70b-versatile',
+        messages:[{role:'user',content:`Define la palabra o concepto "${word}" en español de forma clara y detallada (3-4 líneas). Luego da 2 ejemplos de uso en oraciones completas, relevantes para estudiantes de enseñanza media chilena. Responde SOLO en formato JSON exacto: {"def":"definición detallada","examples":["ejemplo 1","ejemplo 2"]} Sin texto adicional, sin comillas fuera del JSON.`}],
+        max_tokens:250,temperature:0.5
       })
     });
     const data=await resp.json();
     let parsed={def:'',examples:[]};
-    try{const raw=(data.reply||'{}').replace(/```json|```/g,'').trim();parsed=JSON.parse(raw);}catch(e){}
+    try{const raw=(data.choices?.[0]?.message?.content||'{}').replace(/```json|```/g,'').trim();parsed=JSON.parse(raw);}catch(e){}
     state.wordBank.push({word,def:parsed.def||'Sin definición',examples:parsed.examples||[],date:new Date().toLocaleDateString('es-CL')});
     saveState();showNotif('¡Guardada! 📚',`"${word}" en tu banco con definición`,'success');
   }catch(e){
@@ -1569,8 +1574,8 @@ function startEssay(type){
     const keys=['mat-numeros','mat-algebra','mat-geometria','mat-probabilidad'];
     keys.forEach(k=>{(EXERCISE_BANK[k]||[]).forEach(ex=>{questions.push({...ex,_hard:false});});});
   }else if(conf.subject==='mat-m2'){
-    // M2 harder - mark more as hard; includes funciones avanzadas
-    const keys=['mat-algebra','mat-geometria','mat-probabilidad','mat-m2-funciones'];
+    // M2 harder - mark more as hard
+    const keys=['mat-algebra','mat-geometria','mat-probabilidad'];
     keys.forEach(k=>{(EXERCISE_BANK[k]||[]).forEach(ex=>{questions.push({...ex,_hard:true,stem:ex.stem+'\n\n[M2 - Nivel avanzado]'});});});
   }else if(conf.subject==='ciencias'){
     const keys=['cien-ondas','cien-celula'];
@@ -1589,6 +1594,7 @@ function startEssay(type){
   essayState={questions:finalQs,answers:new Array(finalQs.length).fill(null),cur:0,startTime:Date.now(),timer:null,type,totalTime:conf.time,label:conf.label,hardCount:conf.hardCount};
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-essay-active').classList.add('active');
+  document.getElementById('topbarTitle').textContent=conf.label;
   renderEssayQ();
   essayState.timer=setInterval(()=>tickEssayTimer(),1000);
 }
@@ -1837,21 +1843,14 @@ function renderUpload(){
     </div>`).join(''):'<p style="color:var(--text3);font-size:13px">No has subido guías aún.</p>';
 }
 
-async function handlePDFUpload(input){
+function handlePDFUpload(input){
   const file=input.files[0];if(!file)return;
   const sel=document.getElementById('uploadGuideType');
   const custom=document.getElementById('uploadGuideCustom');
   let label=sel?.options[sel.selectedIndex]?.text||'Sin clasificar';
   if(sel?.value==='otro')label=custom?.value||'Sin clasificar';
-  showNotif('Procesando PDF...','Extrayendo preguntas con IA...');
-  const entry={name:file.name,date:new Date().toLocaleDateString('es-CL'),guideLabel:label,size:file.size,questions:[],questionCount:0};
-  try{
-    const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});
-    const resp=await fetch('/api/paes-pdf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pdfBase64:b64,guideLabel:label})});
-    if(resp.ok){const data=await resp.json();entry.questions=data.questions||[];entry.questionCount=data.count||entry.questions.length;}
-  }catch(e){console.warn('PDF extraction error:',e);}
-  state.uploadedFiles.push(entry);
-  saveState();renderUpload();showNotif('PDF subido',`${file.name}${entry.questionCount?` — ${entry.questionCount} preguntas extraídas`:''}`, 'success');
+  state.uploadedFiles.push({name:file.name,date:new Date().toLocaleDateString('es-CL'),guideLabel:label,size:file.size});
+  saveState();renderUpload();showNotif('PDF subido',file.name,'success');
   input.value='';
 }
 function removeUpload(i){state.uploadedFiles.splice(i,1);saveState();renderUpload();}
@@ -2038,6 +2037,7 @@ function handleAdminPDF(input){
 function openModal(html){document.getElementById('modalContent').innerHTML=html;document.getElementById('modalOverlay').classList.add('open');}
 function closeModal(){document.getElementById('modalOverlay').classList.remove('open');}
 function switchTab(tabId,btn){document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));btn.classList.add('active');document.getElementById(tabId)?.classList.add('active');}
+function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');}
 function showNotif(title,text,type=''){
   const n=document.getElementById('notification');
   document.getElementById('notifTitle').textContent=title;
@@ -2045,6 +2045,24 @@ function showNotif(title,text,type=''){
   n.className=`notification ${type} show`;
   clearTimeout(n._t);n._t=setTimeout(()=>n.classList.remove('show'),4000);
 }
+function promptUserName(){
+  openModal(`<h2>👤 Tu nombre</h2>
+    <input id="nameInp" class="ai-input" style="width:100%;margin-bottom:16px" placeholder="Tu nombre" value="${state.userName!=='Estudiante'?state.userName:''}">
+    <input id="emailInp" class="ai-input" style="width:100%;margin-bottom:16px" type="email" placeholder="Tu email (opcional, para acceso admin)" value="${state.userEmail||''}">
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-primary" onclick="setUserInfo()">Guardar</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+    </div>`);
+}
+function setUserInfo(){
+  const name=document.getElementById('nameInp')?.value.trim();
+  const email=document.getElementById('emailInp')?.value.trim();
+  if(name){state.userName=name;document.getElementById('userName').textContent=name;document.getElementById('avatarInitial').textContent=name[0].toUpperCase();document.getElementById('homeGreeting').textContent=`¡Hola, ${name}! 👋`;}
+  if(email)state.userEmail=email;
+  if(isAdmin()){document.getElementById('adminNavItem').classList.remove('hidden');showNotif('¡Acceso admin activado!','Tienes acceso al panel de administrador','success');}
+  saveState();closeModal();
+}
+
 // ============================================================
 // DAILY REMINDERS
 // ============================================================
@@ -2069,12 +2087,42 @@ function checkReminders(){
 function init(){
   updateStreak();
   document.getElementById('streakCount').textContent=state.streak;
-  document.getElementById('userName').textContent=state.userName;
-  document.getElementById('avatarInitial').textContent=(state.userName[0]||'M').toUpperCase();
+  if(state.userName!=='Estudiante'){
+    document.getElementById('userName').textContent=state.userName;
+    document.getElementById('avatarInitial').textContent=state.userName[0].toUpperCase();
+  }
   if(isAdmin())document.getElementById('adminNavItem').classList.remove('hidden');
   renderHome();
   setupTextSelection();
   checkReminders();
+  if(window.innerWidth<=768)document.getElementById('menuBtn').style.display='block';
+  // Welcome for new users (streak starts at 0)
+  if(!state.totalAnswers&&!state.essays&&state.streak===0){
+    setTimeout(()=>{
+      openModal(`<h2>👋 ¡Bienvenido a PAES·PRO!</h2>
+        <p style="color:var(--text2);margin-bottom:16px">La plataforma de preparación para la PAES 2026. ¿Cuál es tu nombre?</p>
+        <input id="nameInp2" class="ai-input" style="width:100%;margin-bottom:12px" placeholder="Tu nombre">
+        <input id="emailInp2" class="ai-input" type="email" style="width:100%;margin-bottom:16px" placeholder="Tu email (opcional)">
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-primary" onclick="welcomeSetup()">Comenzar →</button>
+          <button class="btn btn-ghost" onclick="closeModal()">Omitir</button>
+        </div>`);
+    },800);
+  }
+}
+
+function welcomeSetup(){
+  const name=document.getElementById('nameInp2')?.value.trim();
+  const email=document.getElementById('emailInp2')?.value.trim();
+  if(name){state.userName=name;document.getElementById('userName').textContent=name;document.getElementById('avatarInitial').textContent=name[0].toUpperCase();}
+  if(email)state.userEmail=email;
+  // Streak starts at 0, not 1
+  state.streak=0;
+  saveState();closeModal();
+  if(isAdmin()){document.getElementById('adminNavItem').classList.remove('hidden');showNotif('👑 Admin activado','Tienes acceso completo al panel admin','success');}
+  else{showNotif('¡Bienvenido! 🎉','Tu progreso se guardará automáticamente','success');}
+  renderHome();
+  document.getElementById('streakCount').textContent=0;
 }
 
 init();
