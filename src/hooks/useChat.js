@@ -50,7 +50,8 @@ function toolLabel(name) {
     listar_eventos_calendario: 'Consultando Google Calendar…',
     crear_evento_calendario:   'Creando evento en Calendar…',
     editar_evento_calendario:  'Editando evento en Calendar…',
-    borrar_evento_calendario:  'Eliminando evento de Calendar…',
+    borrar_evento_calendario:        'Eliminando evento de Calendar…',
+    batch_borrar_eventos_calendario: 'Eliminando eventos de Calendar…',
   }
   return labels[name] || 'Ejecutando acción…'
 }
@@ -258,18 +259,42 @@ export function useChat(uid) {
         const gcalToken = getGcalToken()
         if (!gcalToken) return 'Error: Google Calendar no está conectado o el token expiró'
         console.log('[GCal] borrar_evento_calendario → eventId:', toolInput.eventId)
-        console.log('[GCal] DELETE URL:', `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(toolInput.eventId)}`)
         try {
           await gcalEliminarEvento(gcalToken, toolInput.eventId)
           return 'Evento eliminado del calendario'
         } catch (e) {
-          // 404 = no existe, 410 = ya fue borrado → el objetivo (que no esté) ya se cumple
           if (e.message?.includes('404') || e.message?.includes('410') ||
               e.message?.includes('notFound') || e.message?.includes('deleted')) {
             return 'Evento eliminado del calendario'
           }
           throw e
         }
+      }
+
+      case 'batch_borrar_eventos_calendario': {
+        const gcalToken = getGcalToken()
+        if (!gcalToken) return 'Error: Google Calendar no está conectado o el token expiró'
+        const ids = (toolInput.eventIds || '').split(',').map(s => s.trim()).filter(Boolean)
+        if (!ids.length) return 'No se especificaron eventos para borrar'
+        console.log('[GCal] batch borrar:', ids.length, 'eventos')
+        let succeeded = 0, failed = 0
+        for (const eid of ids) {
+          try {
+            await gcalEliminarEvento(gcalToken, eid)
+            succeeded++
+          } catch (e) {
+            if (e.message?.includes('404') || e.message?.includes('410') ||
+                e.message?.includes('notFound') || e.message?.includes('deleted')) {
+              succeeded++  // ya borrado = éxito
+            } else {
+              console.error('[GCal] Error al borrar', eid, e.message)
+              failed++
+            }
+          }
+        }
+        const total = ids.length
+        if (failed === 0) return `${succeeded} evento${total !== 1 ? 's' : ''} eliminado${total !== 1 ? 's' : ''} del calendario`
+        return `Eliminé ${succeeded} de ${total} eventos. ${failed} no se pu${failed === 1 ? 'do' : 'dieron'} borrar.`
       }
 
       default:
@@ -362,6 +387,11 @@ export function useChat(uid) {
             }
             allBorrarBlocks.push(block)
             allBorrarResults.push({ tool_use_id: block.id, result })
+          } else if (block.name === 'batch_borrar_eventos_calendario') {
+            // batch: ejecuta todos los deletes internamente y retorna el resumen
+            result = await executeTool(block.name, block.input)
+            allBorrarBlocks.push(block)
+            allBorrarResults.push({ tool_use_id: block.id, result, isBatch: true, batchResult: result })
           } else {
             if (block.name !== 'listar_eventos_calendario') hasNonBorrar = true
             result = await executeTool(block.name, block.input)
@@ -398,19 +428,26 @@ export function useChat(uid) {
       let finalText = ''
 
       if (allBorrarBlocks.length > 0 && !hasNonBorrar) {
-        // Turno de solo borrados (con o sin listar previo): conteo local preciso
-        const total     = allBorrarBlocks.length
-        const succeeded = allBorrarResults.filter(tr => tr.result.includes('eliminado')).length
-        const failed    = total - succeeded
-
-        if (total === 1 && succeeded === 1) {
-          finalText = 'Listo, el evento fue eliminado del calendario.'
-        } else if (failed === 0) {
-          finalText = `Listo, cancelé ${total} evento${total !== 1 ? 's' : ''} del calendario.`
-        } else if (succeeded === 0) {
-          finalText = `No se pudo borrar ninguno de los ${total} eventos. Revisá la conexión con Google Calendar.`
+        // Turno de solo borrados (con o sin listar previo): mensaje con conteo real
+        const hasBatch = allBorrarResults.some(r => r.isBatch)
+        if (hasBatch) {
+          // batch_borrar ya genera el mensaje completo — usarlo directamente
+          const batchMsg = allBorrarResults.find(r => r.isBatch)?.batchResult || 'Eventos eliminados.'
+          finalText = `Listo, ${batchMsg.charAt(0).toLowerCase()}${batchMsg.slice(1)}`
         } else {
-          finalText = `Cancelé ${succeeded} de ${total} eventos. ${failed} no se pu${failed === 1 ? 'do' : 'dieron'} borrar.`
+          // borrar individual (posiblemente múltiples rondas del agentic loop)
+          const total     = allBorrarBlocks.length
+          const succeeded = allBorrarResults.filter(tr => tr.result.includes('eliminado')).length
+          const failed    = total - succeeded
+          if (total === 1 && succeeded === 1) {
+            finalText = 'Listo, el evento fue eliminado del calendario.'
+          } else if (failed === 0) {
+            finalText = `Listo, cancelé ${total} evento${total !== 1 ? 's' : ''} del calendario.`
+          } else if (succeeded === 0) {
+            finalText = `No se pudo borrar ninguno de los ${total} eventos. Revisá la conexión con Google Calendar.`
+          } else {
+            finalText = `Cancelé ${succeeded} de ${total} eventos. ${failed} no se pu${failed === 1 ? 'do' : 'dieron'} borrar.`
+          }
         }
         pushUi({ id: `a2-${Date.now()}`, role: 'assistant', text: finalText })
       } else {

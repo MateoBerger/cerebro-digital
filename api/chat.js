@@ -68,13 +68,30 @@ const GCAL_TOOLS = [
     type: 'function',
     function: {
       name: 'borrar_evento_calendario',
-      description: 'Elimina un evento de Google Calendar. Confirmá con Mateo antes de borrar si hay ambigüedad.',
+      description: 'Elimina UN solo evento de Google Calendar. Para borrar 2 o más eventos usá batch_borrar_eventos_calendario.',
       parameters: {
         type: 'object',
         properties: {
           eventId: { type: 'string', description: 'ID del evento a eliminar' },
         },
         required: ['eventId'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'batch_borrar_eventos_calendario',
+      description: 'Elimina MÚLTIPLES eventos de Google Calendar de una sola vez. Usá esta herramienta cuando debas borrar 2 o más eventos confirmados. Pasá todos los eventIds juntos.',
+      parameters: {
+        type: 'object',
+        properties: {
+          eventIds: {
+            type:        'string',
+            description: 'eventIds a eliminar separados por comas. Ej: "id1,id2,id3". Copiá los eventIds LITERALES de listar_eventos_calendario.',
+          },
+        },
+        required: ['eventIds'],
       },
     },
   },
@@ -246,10 +263,11 @@ FLUJO PARA BORRAR O EDITAR (seguilo internamente sin explicarlo al usuario):
    GRAMÁTICA OBLIGATORIA: usá siempre PRESENTE al preguntar ("¿Cancelo?", "¿Borro?", "¿Elimino?"). NUNCA pasado ("¿Canceló?", "¿Borró?"). Estás preguntando, no informando.
 
 3. Con el "sí" de Mateo:
-   - 1 evento → 1 llamada a borrar_evento_calendario.
-   - N eventos → N llamadas a borrar_evento_calendario en la MISMA respuesta (tool calls paralelos).
-     Si hay 24 eventos para borrar, tu respuesta debe incluir exactamente 24 tool calls de borrar_evento_calendario, cada una con el eventId de ese evento.
-     NUNCA borres solo 1 cuando hay que borrar N. Copiá el eventId EXACTO de cada evento del listado.
+   - 1 evento → llamá borrar_evento_calendario con ese eventId.
+   - 2 o más eventos → llamá batch_borrar_eventos_calendario con TODOS los eventIds separados por comas.
+     Ej: batch_borrar_eventos_calendario({ eventIds: "id1,id2,id3" })
+     NUNCA hagas borrar_evento_calendario múltiple cuando tenés que borrar N; usá el batch.
+     Copiá cada eventId LITERAL de los resultados de listar_eventos_calendario.
 
 REGLAS DE IDs:
 - NUNCA inventes ni construyas un eventId. Solo podés usar eventIds recibidos como resultado de listar_eventos_calendario en ese mismo turno.
