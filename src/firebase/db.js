@@ -325,7 +325,7 @@ const DEFAULT_DAILY_GOALS_ITEMS = [
   { id: 'item_creatina', label: 'Tomar creatina' },
   { id: 'item_gym',      label: 'Ir al gym' },
   { id: 'item_estudio',  label: 'Bloque de estudio completado' },
-  { id: 'item_preu',     label: 'Fui al preu' },
+  { id: 'item_preu',     label: 'Asistí al preu' },
 ]
 
 export function subscribeDailyGoalsConfig(uid, callback) {

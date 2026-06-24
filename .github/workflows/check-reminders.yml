@@ -1,0 +1,32 @@
+name: Check Reminders
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'   # cada 30 minutos UTC — la TZ Chile se evalúa en el endpoint
+  workflow_dispatch:          # permite dispararlo manualmente desde GitHub Actions
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Call /api/check-reminders
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -d "{\"uid\":\"${{ secrets.USER_UID }}\"}" \
+            "${{ secrets.APP_URL }}/api/check-reminders")
+
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "Status: $HTTP_STATUS"
+          echo "Body:   $BODY"
+
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "Error: endpoint retornó HTTP $HTTP_STATUS"
+            exit 1
+          fi

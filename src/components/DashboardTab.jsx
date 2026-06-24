@@ -349,10 +349,20 @@ function EmptyState({ text, hint }) {
   )
 }
 
+// Días en que hay preu: Dom=0, Lun=1, Mar=2, Jue=4
+const PREU_DAYS = new Set([0, 1, 2, 4])
+
 // ── MetasDiariasCard (hábitos marcables) ──────────────────────
 function MetasDiariasCard({ items, state, uid }) {
-  const checked = items.filter(i => state[i.id]).length
-  const allDone = items.length > 0 && checked === items.length
+  const dow = chileDate().getDay()
+
+  // Filtrar preu los días que no hay clase; renombrar label
+  const visibleItems = items
+    .map(item => item.id === 'item_preu' ? { ...item, label: 'Asistí al preu' } : item)
+    .filter(item => item.id !== 'item_preu' || PREU_DAYS.has(dow))
+
+  const checked = visibleItems.filter(i => state[i.id]).length
+  const allDone = visibleItems.length > 0 && checked === visibleItems.length
 
   async function handleToggle(item) {
     await toggleDailyGoal(uid, TODAY, item.id, !state[item.id])
@@ -362,17 +372,17 @@ function MetasDiariasCard({ items, state, uid }) {
     <div className="card">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
         <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text0)', letterSpacing: '.1px' }}>Hábitos de hoy</h2>
-        {items.length > 0 && (
+        {visibleItems.length > 0 && (
           <span style={{ fontSize: '11px', color: allDone ? 'var(--green)' : 'var(--text2)', fontWeight: allDone ? 600 : 400 }}>
-            {checked}/{items.length}
+            {checked}/{visibleItems.length}
           </span>
         )}
       </div>
-      {items.length === 0 ? (
+      {visibleItems.length === 0 ? (
         <EmptyState text="Sin hábitos configurados" hint="Pedile al asistente que agregue uno" />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {items.map(item => {
+          {visibleItems.map(item => {
             const done = !!state[item.id]
             return (
               <div key={item.id} style={{ display: 'flex', gap: '9px', alignItems: 'center' }}>
