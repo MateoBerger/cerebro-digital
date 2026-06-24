@@ -314,26 +314,39 @@ export function useChat(uid) {
       const context   = buildContext()
       const gcalToken = getGcalToken()
 
-      const r1 = await fetch('/api/chat', {
+      // workingMsgs acumula historial + intercambios de tools de este turno
+      let workingMsgs = [...newApiMsgs]
+
+      // Para cierre local de borrados: rastrear a través de TODAS las rondas del turno
+      let allBorrarBlocks  = []
+      let allBorrarResults = []
+      // listar_eventos no cuenta como "non-borrar" (es paso intermedio del flujo de borrado)
+      let hasNonBorrar = false
+
+      // ── Primera llamada al modelo ─────────────────────────────
+      let d = await parseResponse(await fetch('/api/chat', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ messages: newApiMsgs, context, gcal_token: gcalToken }),
-      })
-      const d1 = await parseResponse(r1)
-      checkError(d1)
+        body:    JSON.stringify({ messages: workingMsgs, context, gcal_token: gcalToken }),
+      }))
+      checkError(d)
 
-      if (d1.stop_reason === 'tool_use') {
-        const textBefore = d1.content.find(b => b.type === 'text')?.text
-        if (textBefore) pushUi({ id: `a-${Date.now()}`, role: 'assistant', text: textBefore })
-
-        const toolBlocks = d1.content.filter(b => b.type === 'tool_use')
+      // ── Agentic loop: una ronda por cada tool_use del modelo ──
+      for (let round = 0; d.stop_reason === 'tool_use' && round < 10; round++) {
+        const toolBlocks  = d.content.filter(b => b.type === 'tool_use')
         const toolResults = []
-        const seenBorrar = new Set()  // evita doble DELETE del mismo eventId en un turno
+        const seenBorrar  = new Set()
+
+        console.log(`[chat] ronda ${round + 1}: ${toolBlocks.length} tool_call(s) — ${toolBlocks.map(b => b.name).join(', ')}`)
+
+        const textBefore = d.content.find(b => b.type === 'text')?.text
+        if (textBefore) pushUi({ id: `a-${Date.now()}`, role: 'assistant', text: textBefore })
 
         for (const block of toolBlocks) {
           const chipId = `chip-${block.id}`
           pushUi({ id: chipId, role: 'action', text: toolLabel(block.name), pending: true })
           let result
+
           if (block.name === 'borrar_evento_calendario') {
             const eid = block.input?.eventId
             if (eid && seenBorrar.has(eid)) {
@@ -343,58 +356,25 @@ export function useChat(uid) {
               try {
                 result = await executeTool(block.name, block.input)
               } catch (borrarErr) {
-                // Capturamos errores individuales para no abortar los borrados restantes
                 console.error('[GCal] Error en borrar_evento_calendario:', eid, borrarErr.message)
                 result = `Error al borrar: ${borrarErr.message.slice(0, 80)}`
               }
             }
+            allBorrarBlocks.push(block)
+            allBorrarResults.push({ tool_use_id: block.id, result })
           } else {
+            if (block.name !== 'listar_eventos_calendario') hasNonBorrar = true
             result = await executeTool(block.name, block.input)
           }
+
           replaceUi(chipId, { text: toolResultUiText(block.name, result), pending: false })
           toolResults.push({ tool_use_id: block.id, result })
         }
 
-        // Si el turno fue solo borrado(s), generar el cierre localmente con conteo real.
-        const allBorrar = toolBlocks.length > 0 && toolBlocks.every(b => b.name === 'borrar_evento_calendario')
-
-        let finalText = ''
-        if (allBorrar) {
-          const total     = toolBlocks.length
-          const succeeded = toolResults.filter(tr => tr.result.includes('eliminado')).length
-          const failed    = total - succeeded
-
-          if (total === 1 && succeeded === 1) {
-            finalText = 'Listo, el evento fue eliminado del calendario.'
-          } else if (failed === 0) {
-            finalText = `Listo, cancelé ${total} eventos del calendario.`
-          } else if (succeeded === 0) {
-            finalText = `No se pudo borrar ninguno de los ${total} eventos. Revisá la conexión con Google Calendar.`
-          } else {
-            finalText = `Cancelé ${succeeded} de ${total} eventos. ${failed} no se pu${failed === 1 ? 'do' : 'dieron'} borrar.`
-          }
-          pushUi({ id: `a2-${Date.now()}`, role: 'assistant', text: finalText })
-        } else {
-          const r2 = await fetch('/api/chat', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({
-              messages:          newApiMsgs,
-              context,
-              assistant_content: d1.content,
-              tool_results:      toolResults,
-              gcal_token:        gcalToken,
-            }),
-          })
-          const d2 = await parseResponse(r2)
-          checkError(d2)
-          finalText = d2.content?.find(b => b.type === 'text')?.text || ''
-          if (finalText) pushUi({ id: `a2-${Date.now()}`, role: 'assistant', text: finalText })
-        }
-
-        apiMsgsRef.current = [
-          ...newApiMsgs,
-          { role: 'assistant', content: d1.content },
+        // Acumular este round en workingMsgs para la próxima llamada
+        workingMsgs = [
+          ...workingMsgs,
+          { role: 'assistant', content: d.content },
           {
             role:    'user',
             content: toolResults.map(tr => ({
@@ -403,13 +383,45 @@ export function useChat(uid) {
               content:     String(tr.result),
             })),
           },
-          { role: 'assistant', content: finalText },
         ]
-      } else {
-        const reply = d1.content?.find(b => b.type === 'text')?.text || '...'
-        pushUi({ id: `a-${Date.now()}`, role: 'assistant', text: reply })
-        apiMsgsRef.current = [...newApiMsgs, { role: 'assistant', content: reply }]
+
+        // Siguiente llamada — is_continuation evita recortar el contexto intra-turno en el API
+        d = await parseResponse(await fetch('/api/chat', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ messages: workingMsgs, context, gcal_token: gcalToken, is_continuation: true }),
+        }))
+        checkError(d)
       }
+
+      // ── Mensaje final ─────────────────────────────────────────
+      let finalText = ''
+
+      if (allBorrarBlocks.length > 0 && !hasNonBorrar) {
+        // Turno de solo borrados (con o sin listar previo): conteo local preciso
+        const total     = allBorrarBlocks.length
+        const succeeded = allBorrarResults.filter(tr => tr.result.includes('eliminado')).length
+        const failed    = total - succeeded
+
+        if (total === 1 && succeeded === 1) {
+          finalText = 'Listo, el evento fue eliminado del calendario.'
+        } else if (failed === 0) {
+          finalText = `Listo, cancelé ${total} evento${total !== 1 ? 's' : ''} del calendario.`
+        } else if (succeeded === 0) {
+          finalText = `No se pudo borrar ninguno de los ${total} eventos. Revisá la conexión con Google Calendar.`
+        } else {
+          finalText = `Cancelé ${succeeded} de ${total} eventos. ${failed} no se pu${failed === 1 ? 'do' : 'dieron'} borrar.`
+        }
+        pushUi({ id: `a2-${Date.now()}`, role: 'assistant', text: finalText })
+      } else {
+        // Texto final del modelo (del end_turn)
+        finalText = d.content?.find(b => b.type === 'text')?.text || ''
+        if (finalText) pushUi({ id: `a-${Date.now()}`, role: 'assistant', text: finalText })
+      }
+
+      // Actualizar historial persistente con todos los intercambios del turno
+      apiMsgsRef.current = [...workingMsgs, { role: 'assistant', content: finalText }]
+
     } catch (err) {
       pushUi({ id: `err-${Date.now()}`, role: 'assistant', text: `Error: ${err.message}`, isError: true })
     }

@@ -194,6 +194,7 @@ function normalizeResponse(data) {
   const finishReason = choice.finish_reason
 
   if (finishReason === 'tool_calls' && msg.tool_calls?.length) {
+    console.log('[chat] tool_calls en respuesta:', msg.tool_calls.length, '—', msg.tool_calls.map(tc => tc.function.name).join(', '))
     const content = []
     if (msg.content) content.push({ type: 'text', text: msg.content })
     for (const tc of msg.tool_calls) {
@@ -305,12 +306,18 @@ export default async function handler(req, res) {
   console.log(`[chat] ${API_KEY_ENV} present:`, !!key, '| length:', key?.length ?? 0)
   if (!key) return res.status(500).json({ error: `${API_KEY_ENV} no configurada en Vercel` })
 
-  const { messages, context, assistant_content, tool_results, gcal_token } = req.body
+  const { messages, context, assistant_content, tool_results, gcal_token, is_continuation } = req.body
 
-  // Recortar historial; asegurarse de empezar en un mensaje de usuario
-  const raw          = (messages || []).slice(-MAX_HISTORY)
-  const firstUserIdx = raw.findIndex(m => m.role === 'user')
-  const trimmed      = firstUserIdx > 0 ? raw.slice(firstUserIdx) : raw
+  // Para continuaciones del agentic loop, no recortar — el frontend ya maneja el contexto intra-turno.
+  // Para llamadas iniciales, recortar a MAX_HISTORY para respetar el límite de ~8K tokens.
+  let trimmed
+  if (is_continuation) {
+    trimmed = messages || []
+  } else {
+    const raw      = (messages || []).slice(-MAX_HISTORY)
+    const firstIdx = raw.findIndex(m => m.role === 'user')
+    trimmed        = firstIdx > 0 ? raw.slice(firstIdx) : raw
+  }
 
   let providerMessages = toProviderMessages(trimmed)
 
