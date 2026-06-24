@@ -225,6 +225,19 @@ nav{padding:8px 0;flex:1;overflow-y:auto;}
 .ensayo-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:10px;transition:border-color .2s;}
 .ensayo-row:hover{border-color:var(--accent);}
 @media(max-width:600px){.ensayo-form-grid{grid-template-columns:1fr;}}
+/* ── SUBIR ENSAYO ─────────────────────────────────── */
+.preview-question{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:10px;}
+.preview-question .pq-num{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);font-weight:600;margin-bottom:4px;}
+.preview-question .pq-stem{font-size:14px;color:var(--text);margin-bottom:8px;line-height:1.5;}
+.preview-question .pq-correct{font-size:12px;font-weight:600;color:var(--green);}
+.subir-progress-wrap{margin-top:12px;}
+.subir-progress-log{font-size:13px;color:var(--text2);min-height:20px;margin-bottom:6px;}
+.subir-progress-bar{height:5px;background:var(--surface2);border-radius:100px;overflow:hidden;}
+.subir-progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:100px;transition:width .4s;}
+.ensayo-subido-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;display:flex;align-items:center;gap:14px;}
+.ensayo-subido-info{flex:1;}
+.ensayo-subido-title{font-family:var(--font-head);font-size:15px;font-weight:700;margin-bottom:3px;}
+.ensayo-subido-meta{font-size:12px;color:var(--text3);}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 </head>
@@ -259,6 +272,7 @@ nav{padding:8px 0;flex:1;overflow-y:auto;}
     <div class="nav-section">Evaluación</div>
     <div class="nav-item" onclick="navigate('essays')"><span class="nav-icon">📝</span>Ensayos</div>
     <div class="nav-item" onclick="navigate('registro')"><span class="nav-icon">📋</span>Mis Ensayos</div>
+    <div class="nav-item" onclick="navigate('subir-ensayo')"><span class="nav-icon">📥</span>Subir Ensayo</div>
     <div class="nav-item" onclick="navigate('upload')"><span class="nav-icon">📤</span>Subir Guía</div>
     <div class="nav-item" onclick="navigate('download')"><span class="nav-icon">⬇️</span>Descargar PDF</div>
     <div class="nav-section">Personal</div>
@@ -334,8 +348,16 @@ nav{padding:8px 0;flex:1;overflow-y:auto;}
 
   <!-- PRACTICE -->
   <section class="page" id="page-practice">
-    <div class="section-header"><h2>Práctica Rápida</h2><p>5 ejercicios. Límite: 1 vez cada 24 horas por área y dificultad. Solo aparecen temas con suficientes ejercicios.</p></div>
-    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;align-items:flex-end">
+    <div class="section-header"><h2>Práctica Rápida</h2><p>5 ejercicios del banco de preguntas o de un ensayo que hayas subido.</p></div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;align-items:flex-end">
+      <div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:600">Fuente</div>
+        <select id="practiceFuente" class="ai-input" style="width:230px" onchange="onPracticeFuenteChange()">
+          <option value="banco">📚 Banco de preguntas</option>
+        </select>
+      </div>
+    </div>
+    <div id="practiceBancoControls" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;align-items:flex-end">
       <div>
         <div style="font-size:11px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:600">Asignatura</div>
         <select id="practiceSubject" class="ai-input" style="width:210px" onchange="updatePracticeTopics()">
@@ -360,6 +382,10 @@ nav{padding:8px 0;flex:1;overflow-y:auto;}
         <div id="practiceRateInfo" style="font-size:12px;color:var(--text3);margin-bottom:6px;min-height:16px"></div>
         <button class="btn btn-primary" id="generatePracticeBtn" onclick="generateExercises()">⚡ Generar 5 ejercicios</button>
       </div>
+    </div>
+    <div id="practiceEnsayoControls" style="display:none;margin-bottom:20px">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:10px">5 preguntas aleatorias del ensayo seleccionado.</div>
+      <button class="btn btn-primary" onclick="generateExercises()">⚡ Practicar 5 preguntas</button>
     </div>
     <div id="practiceArea"></div>
     <div id="practiceAI" class="hidden" style="margin-top:24px">
@@ -546,6 +572,51 @@ nav{padding:8px 0;flex:1;overflow-y:auto;}
     <!-- Lista de ensayos -->
     <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px">Historial de ensayos</h3>
     <div id="ensayosList"></div>
+  </section>
+
+  <!-- SUBIR ENSAYO -->
+  <section class="page" id="page-subir-ensayo">
+    <div class="section-header">
+      <h2>📥 Subir Ensayo</h2>
+      <p>Pega el texto de un ensayo PAES (convertido desde PDF) y la IA extrae las preguntas para practicarlas en Práctica Rápida.</p>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-btn-subir-form" onclick="switchTab('tab-subir-form',this)">+ Procesar Nuevo</button>
+      <button class="tab-btn" id="tab-btn-subir-lista" onclick="switchTab('tab-subir-lista',this);renderEnsayosSubidos()">📋 Mis Ensayos Subidos</button>
+    </div>
+    <div class="tab-pane active" id="tab-subir-form">
+      <div style="max-width:800px">
+        <div class="ensayo-form-grid" style="margin-bottom:16px">
+          <div class="form-group">
+            <label class="form-label">Nombre del ensayo</label>
+            <input type="text" id="subir-nombre" class="ai-input" placeholder='Ej: Ensayo CyC Ciencias #3' style="width:100%">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Prueba</label>
+            <select id="subir-prueba" class="ai-input" style="width:100%">
+              <option value="M1">M1 — Matemática 1</option>
+              <option value="M2">M2 — Matemática 2</option>
+              <option value="C. Lectora">Competencia Lectora</option>
+              <option value="Ciencias">Ciencias</option>
+              <option value="Historia">Historia y Cs. Sociales</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:18px">
+          <label class="form-label">Texto del ensayo (pegado desde PDF)</label>
+          <textarea id="subir-texto" class="notes-area" style="min-height:280px" placeholder="Pega aquí el texto completo del ensayo. Asegúrate de incluir tanto las preguntas como la clave de respuestas (al final o junto a cada pregunta). La IA SOLO usará las claves que encuentre en el texto — nunca inventará respuestas."></textarea>
+        </div>
+        <button class="btn btn-primary btn-lg" id="btn-procesar" onclick="procesarEnsayo()">⚡ Procesar ensayo</button>
+        <div class="subir-progress-wrap hidden" id="subir-progress-wrap">
+          <div class="subir-progress-log" id="subir-progress-log"></div>
+          <div class="subir-progress-bar"><div class="subir-progress-fill" id="subir-progress-fill" style="width:0%"></div></div>
+        </div>
+        <div id="subir-preview" style="margin-top:24px"></div>
+      </div>
+    </div>
+    <div class="tab-pane" id="tab-subir-lista">
+      <div id="ensayos-subidos-lista"></div>
+    </div>
   </section>
 
   <!-- ESSAY ACTIVE -->
@@ -1011,12 +1082,13 @@ let state=JSON.parse(localStorage.getItem('paes_v3')||'null')||{
   errors:[],history:[],
   vocab:{lastWordDate:null,learnedToday:false,currentPos:0,learnedWords:[],seed:Math.random()},
   progress:{},wordBank:[],books:[],uploadedFiles:[],
-  practiceRateLimit:{},seenExIds:new Set(),ensayosRegistro:[]
+  practiceRateLimit:{},seenExIds:new Set(),ensayosRegistro:[],ensayosSubidos:[]
 };
 // Convert seenExIds from array if loaded from JSON
 if(Array.isArray(state.seenExIds)) state.seenExIds=new Set(state.seenExIds);
 // Migración: usuarios existentes no tienen ensayosRegistro
 if(!state.ensayosRegistro)state.ensayosRegistro=[];
+if(!state.ensayosSubidos)state.ensayosSubidos=[];
 
 function saveState(){
   const toSave={...state,seenExIds:[...state.seenExIds]};
@@ -1053,7 +1125,7 @@ function navigate(page){
   if(pageEl)pageEl.classList.add('active');
   const navEl=document.querySelector(`.nav-item[onclick="navigate('${page}')"]`);
   if(navEl)navEl.classList.add('active');
-  const titles={home:'Inicio',tutor:'Tutor IA',guides:'Guías',practice:'Práctica Rápida',errors:'Practicar Errores',vocab:'Vocabulario',wordbank:'Banco de Palabras',mathTips:'Tips Matemáticas',dato:'Dato del Día',essays:'Ensayos',registro:'Mis Ensayos',progress:'Mi Progreso',books:'Mis Libros',upload:'Subir Guía',download:'Descargar PDF',admin:'Panel Admin','guide-detail':'Guías'};
+  const titles={home:'Inicio',tutor:'Tutor IA',guides:'Guías',practice:'Práctica Rápida',errors:'Practicar Errores',vocab:'Vocabulario',wordbank:'Banco de Palabras',mathTips:'Tips Matemáticas',dato:'Dato del Día',essays:'Ensayos',registro:'Mis Ensayos','subir-ensayo':'Subir Ensayo',progress:'Mi Progreso',books:'Mis Libros',upload:'Subir Guía',download:'Descargar PDF',admin:'Panel Admin','guide-detail':'Guías'};
   document.getElementById('topbarTitle').textContent=titles[page]||page;
   if(page==='home')renderHome();
   if(page==='tutor')renderTutor();
@@ -1071,6 +1143,7 @@ function navigate(page){
   if(page==='download')renderDownload();
   if(page==='admin')renderAdmin();
   if(page==='registro')renderRegistro();
+  if(page==='subir-ensayo')renderSubirEnsayo();
 }
 
 // ============================================================
@@ -1198,8 +1271,28 @@ const PRACTICE_TOPICS={
 };
 
 function renderPracticeInit(){
+  updatePracticeSourceSelector();
+  onPracticeFuenteChange();
   updatePracticeTopics();
   updateRateLimitUI();
+}
+
+function updatePracticeSourceSelector(){
+  const sel=document.getElementById('practiceFuente');
+  if(!sel)return;
+  const ensayos=state.ensayosSubidos||[];
+  sel.innerHTML=`<option value="banco">📚 Banco de preguntas</option>`
+    +ensayos.map(e=>`<option value="${e.id}">📥 ${e.nombre} (${e.preguntas.length} preg.)</option>`).join('');
+}
+
+function onPracticeFuenteChange(){
+  const v=document.getElementById('practiceFuente')?.value||'banco';
+  const isBanco=v==='banco';
+  const bancoCtrl=document.getElementById('practiceBancoControls');
+  const ensayoCtrl=document.getElementById('practiceEnsayoControls');
+  if(bancoCtrl)bancoCtrl.style.display=isBanco?'flex':'none';
+  if(ensayoCtrl)ensayoCtrl.style.display=isBanco?'none':'block';
+  if(isBanco)updateRateLimitUI();
 }
 
 function updatePracticeTopics(){
@@ -1240,6 +1333,19 @@ function updateRateLimitUI(){
 }
 
 function generateExercises(){
+  const fuente=document.getElementById('practiceFuente')?.value||'banco';
+  if(fuente!=='banco'){
+    const ensayo=state.ensayosSubidos?.find(e=>e.id===fuente);
+    if(!ensayo||!ensayo.preguntas?.length){showNotif('Sin preguntas','Este ensayo no tiene preguntas extraídas','error');return;}
+    const pool=[...ensayo.preguntas].sort(()=>Math.random()-.5);
+    practiceExs=pool.slice(0,5);practiceAnswered=new Array(practiceExs.length).fill(null);practiceCur=0;
+    renderPracticeEx();
+    document.getElementById('practiceAI').classList.remove('hidden');
+    const msgs=document.getElementById('aiMessages');
+    if(msgs)msgs.innerHTML='<div class="ai-msg ai">¡Listo! 5 preguntas del ensayo. Selecciona texto para buscar palabras, o pregúntame sobre cualquier ejercicio.</div>';
+    showNotif('¡Ejercicios generados!',`5 preguntas de "${ensayo.nombre}"`,'success');
+    return;
+  }
   if(!checkRL()){showNotif('Límite alcanzado','Vuelve en '+getTimeLeft(),'error');return;}
   const subj=document.getElementById('practiceSubject').value;
   const topicIdx=parseInt(document.getElementById('practiceTopic').value)||0;
@@ -2395,6 +2501,181 @@ function setUserInfo(){
   if(email)state.userEmail=email;
   if(isAdmin()){document.getElementById('adminNavItem').classList.remove('hidden');showNotif('¡Acceso admin activado!','Tienes acceso al panel de administrador','success');}
   saveState();closeModal();
+}
+
+// ============================================================
+// SUBIR ENSAYO — PROCESAMIENTO Y GESTIÓN
+// ============================================================
+function renderSubirEnsayo(){
+  // Restore form tab as active when navigating here
+  const formTab=document.getElementById('tab-subir-form');
+  const listaTab=document.getElementById('tab-subir-lista');
+  if(formTab&&listaTab){
+    document.querySelectorAll('#page-subir-ensayo .tab-pane').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('#page-subir-ensayo .tab-btn').forEach(b=>b.classList.remove('active'));
+    formTab.classList.add('active');
+    document.getElementById('tab-btn-subir-form')?.classList.add('active');
+  }
+}
+
+async function procesarEnsayo(){
+  const texto=document.getElementById('subir-texto')?.value.trim();
+  const prueba=document.getElementById('subir-prueba')?.value||'M1';
+  const nombre=(document.getElementById('subir-nombre')?.value.trim())||`Ensayo ${prueba} ${new Date().toLocaleDateString('es-CL')}`;
+
+  if(!texto||texto.length<100){showNotif('Texto vacío','Pega el texto completo del ensayo primero','error');return;}
+
+  const btn=document.getElementById('btn-procesar');
+  if(btn)btn.disabled=true;
+  const wrapEl=document.getElementById('subir-progress-wrap');
+  const logEl=document.getElementById('subir-progress-log');
+  const fillEl=document.getElementById('subir-progress-fill');
+  const previewEl=document.getElementById('subir-preview');
+  if(wrapEl)wrapEl.classList.remove('hidden');
+  if(previewEl)previewEl.innerHTML='';
+
+  const BLOCK=15;
+  const MAX_Q=80;
+  let allQuestions=[];
+  let emptyBlocks=0;
+
+  const setLog=(msg,pct)=>{
+    if(logEl)logEl.textContent=msg;
+    if(fillEl)fillEl.style.width=pct+'%';
+  };
+
+  for(let start=1;start<=MAX_Q;start+=BLOCK){
+    const end=Math.min(start+BLOCK-1,MAX_Q);
+    const blockPct=Math.round((start/MAX_Q)*90);
+    setLog(`Procesando preguntas ${start}–${end}...`,blockPct);
+
+    const sysPrompt=`Eres un extractor de preguntas de ensayos PAES chilenos. Tu tarea es extraer preguntas del texto dado y devolver SOLO un array JSON.
+
+REGLAS CRÍTICAS (no negociables):
+1. Usa ÚNICAMENTE la clave de respuestas que aparece en el texto. NUNCA adivines, resuelvas ni inventes la respuesta correcta.
+2. Si no encuentras la respuesta correcta de una pregunta en la clave, omite esa pregunta del output.
+3. Si hay explicación literal en el texto para la pregunta, inclúyela en "explanation". Si no la hay, deja "explanation": "".
+4. Devuelve ÚNICAMENTE un array JSON válido entre corchetes [], sin texto adicional, sin markdown.
+5. Extrae SOLO las preguntas numeradas del ${start} al ${end}.
+6. Si no hay preguntas en ese rango, devuelve exactamente: []
+
+Estructura exacta de cada objeto JSON:
+{"stem":"enunciado completo de la pregunta","options":["opción A","opción B","opción C","opción D"],"correct":0,"explanation":""}
+
+Donde "correct" es el índice 0-3 (0=A, 1=B, 2=C, 3=D).`;
+
+    try{
+      const resp=await fetch('/api/paes-ai',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          system:sysPrompt,
+          messages:[{role:'user',content:`TEXTO DEL ENSAYO:\n\n${texto}\n\n---\nExtrae SOLO las preguntas ${start} al ${end}. Responde únicamente con el array JSON.`}]
+        })
+      });
+      if(resp.status===429){setLog(`⚠️ Límite de API alcanzado. Guardando lo procesado hasta ahora...`,90);break;}
+      if(!resp.ok)throw new Error(`HTTP ${resp.status}`);
+      const data=await resp.json();
+      let raw=(data.text||'').trim();
+      // Extract JSON array from response (strip any surrounding text)
+      const m=raw.match(/\[[\s\S]*\]/);
+      if(m)raw=m[0];
+      const parsed=JSON.parse(raw);
+      if(!Array.isArray(parsed)||!parsed.length){emptyBlocks++;if(emptyBlocks>=2)break;continue;}
+      emptyBlocks=0;
+      const stamped=parsed.filter(q=>
+        q&&typeof q.stem==='string'&&Array.isArray(q.options)&&q.options.length===4&&typeof q.correct==='number'
+      ).map((q,i)=>({...q,id:`subido_${Date.now()}_${start+i}`,correct:Math.min(3,Math.max(0,Math.round(q.correct)))}));
+      allQuestions=allQuestions.concat(stamped);
+      setLog(`✓ ${allQuestions.length} preguntas extraídas hasta ahora...`,blockPct);
+    }catch(e){
+      setLog(`⚠️ Error en bloque ${start}-${end} (${e.message}). Continuando...`,blockPct);
+    }
+    // Brief pause between API calls
+    if(start+BLOCK<=MAX_Q)await new Promise(r=>setTimeout(r,600));
+  }
+
+  if(btn)btn.disabled=false;
+
+  if(!allQuestions.length){
+    setLog('⚠️ No se extrajeron preguntas. Verifica que el texto incluya preguntas numeradas y una clave de respuestas.',0);
+    if(fillEl)fillEl.style.width='0%';
+    return;
+  }
+
+  setLog(`✅ ¡Listo! ${allQuestions.length} preguntas extraídas.`,100);
+
+  // Save to state
+  const ensayo={id:'ens_'+Date.now(),nombre,prueba,fecha:new Date().toLocaleDateString('es-CL'),preguntas:allQuestions};
+  state.ensayosSubidos.push(ensayo);
+  saveState();
+
+  showNotif('¡Ensayo procesado!',`${allQuestions.length} preguntas guardadas como "${nombre}"${allQuestions.length<5?' · Pocas preguntas extraídas, revisa la clave de respuestas':''}`,allQuestions.length>=5?'success':'');
+
+  // Render preview (first 5 questions)
+  const preview=allQuestions.slice(0,5);
+  previewEl.innerHTML=`
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-family:var(--font-head);font-size:16px;font-weight:700">${nombre}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">${prueba} · ${allQuestions.length} preguntas · ${new Date().toLocaleDateString('es-CL')}</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="navigate('practice')">→ Practicar ahora</button>
+      </div>
+      <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:10px">Vista previa (primeras ${preview.length})</div>
+      ${preview.map((q,i)=>`
+        <div class="preview-question">
+          <div class="pq-num">Pregunta ${i+1}</div>
+          <div class="pq-stem">${q.stem.length>140?q.stem.substring(0,140)+'…':q.stem}</div>
+          <div class="pq-correct">✓ Correcta: ${['A','B','C','D'][q.correct]}) ${(q.options[q.correct]||'').substring(0,60)}</div>
+        </div>`).join('')}
+      ${allQuestions.length>5?`<div style="font-size:12px;color:var(--text3);margin-top:8px">...y ${allQuestions.length-5} más guardadas.</div>`:''}
+    </div>`;
+
+  // Refresh practice source selector if open
+  updatePracticeSourceSelector();
+}
+
+function renderEnsayosSubidos(){
+  const container=document.getElementById('ensayos-subidos-lista');
+  if(!container)return;
+  const ensayos=state.ensayosSubidos||[];
+  if(!ensayos.length){
+    container.innerHTML='<p style="color:var(--text3);font-size:14px">Aún no has subido ensayos. Ve a "+ Procesar Nuevo" para empezar.</p>';
+    return;
+  }
+  container.innerHTML=ensayos.slice().reverse().map(e=>`
+    <div class="ensayo-subido-card">
+      <span style="font-size:28px">📥</span>
+      <div class="ensayo-subido-info">
+        <div class="ensayo-subido-title">${e.nombre}</div>
+        <div class="ensayo-subido-meta">${e.prueba} · ${e.preguntas.length} preguntas · ${e.fecha}</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-secondary btn-sm" onclick="practicarEnsayoSubido('${e.id}')">✏️ Practicar</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteEnsayoSubido('${e.id}')">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function practicarEnsayoSubido(id){
+  navigate('practice');
+  // Wait for DOM to update, then set fuente
+  setTimeout(()=>{
+    updatePracticeSourceSelector();
+    const sel=document.getElementById('practiceFuente');
+    if(sel){sel.value=id;onPracticeFuenteChange();}
+  },50);
+}
+
+function deleteEnsayoSubido(id){
+  if(!confirm('¿Eliminar este ensayo subido? No se puede deshacer.'))return;
+  state.ensayosSubidos=state.ensayosSubidos.filter(e=>e.id!==id);
+  saveState();
+  renderEnsayosSubidos();
+  updatePracticeSourceSelector();
+  showNotif('Ensayo eliminado','El ensayo fue removido de tu biblioteca','');
 }
 
 // ============================================================
