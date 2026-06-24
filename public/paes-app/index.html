@@ -1229,24 +1229,34 @@ function appendAIMsg(text,type){
   const div=document.createElement('div');div.className=`ai-msg ${type}`;div.id=id;div.textContent=text;
   msgs?.appendChild(div);msgs?.scrollTo(0,msgs.scrollHeight);return id;
 }
-function stripLatexMd(t){
-  return t
-    .replace(/\\\[[\s\S]*?\\\]/g,m=>m.replace(/\\\[|\\\]/g,'').trim())  // \[ ... \] → contenido
-    .replace(/\\\([\s\S]*?\\\)/g,m=>m.replace(/\\\(|\\\)/g,'').trim())  // \( ... \) → contenido
-    .replace(/\$\$[\s\S]*?\$\$/g,m=>m.replace(/\$\$/g,'').trim())       // $$ ... $$ → contenido
-    .replace(/\$([^$]+)\$/g,'$1')                                        // $...$ → contenido
-    .replace(/\\frac\{([^}]*)\}\{([^}]*)\}/g,'($1)/($2)')               // \frac{a}{b} → (a)/(b)
-    .replace(/\\sqrt\{([^}]*)\}/g,'√($1)')                              // \sqrt{x} → √(x)
-    .replace(/\\\w+\{[^}]*\}/g,m=>m.replace(/\\\w+\{|\}/g,''))         // otros comandos LaTeX
-    .replace(/\\\w+/g,'')                                                // comandos LaTeX sueltos
-    .replace(/^#{1,6}\s+/gm,'')                                          // ### títulos → sin #
-    .replace(/\*\*(.+?)\*\*/g,'$1')                                      // **negrita** → texto
-    .replace(/__(.+?)__/g,'$1')                                          // __negrita__ → texto
-    .replace(/\*(.+?)\*/g,'$1')                                          // *cursiva* → texto
-    .replace(/_(.+?)_/g,'$1')                                            // _cursiva_ → texto
-    .trim()
+function renderMsg(raw){
+  // 1. Strip LaTeX
+  let t=raw
+    .replace(/\\\[[\s\S]*?\\\]/g,m=>m.replace(/\\\[|\\\]/g,'').trim())
+    .replace(/\\\([\s\S]*?\\\)/g,m=>m.replace(/\\\(|\\\)/g,'').trim())
+    .replace(/\$\$[\s\S]*?\$\$/g,m=>m.replace(/\$\$/g,'').trim())
+    .replace(/\$([^$\n]+)\$/g,'$1')
+    .replace(/\\frac\{([^}]*)\}\{([^}]*)\}/g,'($1)/($2)')
+    .replace(/\\sqrt\{([^}]*)\}/g,'√($1)')
+    .replace(/\\\w+\{[^}]*\}/g,m=>m.replace(/\\\w+\{|\}/g,''))
+    .replace(/\\\w+\b/g,'')
+    .replace(/^#{1,6}\s+/gm,'')
+    .trim();
+  // 2. Si el modelo metió todos los pasos en una línea con " - ", expandir a líneas reales
+  const nlCount=(t.match(/\n/g)||[]).length;
+  const dashCount=(t.match(/ - /g)||[]).length;
+  if(nlCount<3&&dashCount>=2)t=t.replace(/ - /g,'\n- ');
+  // 3. HTML-escape antes de agregar etiquetas (seguridad XSS)
+  t=t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // 4. Markdown básico: negrita y viñetas (líneas con "- ")
+  t=t
+    .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+    .replace(/__([^_]+)__/g,'<strong>$1</strong>')
+    .replace(/^- (.+)/gm,'• $1')
+    .replace(/\n/g,'<br>');
+  return t;
 }
-function updateAIMsg(id,text){const el=document.getElementById(id);if(el){el.textContent=stripLatexMd(text);el.className='ai-msg ai';}}
+function updateAIMsg(id,text){const el=document.getElementById(id);if(el){el.innerHTML=renderMsg(text);el.className='ai-msg ai';}}
 
 // ============================================================
 // WORD LOOKUP (works in guides too - all text is selectable)
