@@ -238,6 +238,10 @@ nav{padding:8px 0;flex:1;overflow-y:auto;}
 .ensayo-subido-info{flex:1;}
 .ensayo-subido-title{font-family:var(--font-head);font-size:15px;font-weight:700;margin-bottom:3px;}
 .ensayo-subido-meta{font-size:12px;color:var(--text3);}
+.clave-verify-badge{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:100px;font-size:12px;font-weight:600;}
+.clave-verify-badge.ok{background:rgba(45,204,126,.12);color:var(--green);border:1px solid rgba(45,204,126,.25);}
+.clave-verify-badge.warn{background:rgba(255,204,79,.1);color:var(--yellow);border:1px solid rgba(255,204,79,.25);}
+@media(max-width:700px){.subir-two-col{grid-template-columns:1fr!important;}}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 </head>
@@ -578,14 +582,14 @@ nav{padding:8px 0;flex:1;overflow-y:auto;}
   <section class="page" id="page-subir-ensayo">
     <div class="section-header">
       <h2>📥 Subir Ensayo</h2>
-      <p>Pega el texto de un ensayo PAES (convertido desde PDF) y la IA extrae las preguntas para practicarlas en Práctica Rápida.</p>
+      <p>Pega el texto del ensayo (markitdown) y el clavijero por separado. La IA extrae solo preguntas de texto puro y las empareja con la clave.</p>
     </div>
     <div class="tabs">
       <button class="tab-btn active" id="tab-btn-subir-form" onclick="switchTab('tab-subir-form',this)">+ Procesar Nuevo</button>
       <button class="tab-btn" id="tab-btn-subir-lista" onclick="switchTab('tab-subir-lista',this);renderEnsayosSubidos()">📋 Mis Ensayos Subidos</button>
     </div>
     <div class="tab-pane active" id="tab-subir-form">
-      <div style="max-width:800px">
+      <div style="max-width:920px">
         <div class="ensayo-form-grid" style="margin-bottom:16px">
           <div class="form-group">
             <label class="form-label">Nombre del ensayo</label>
@@ -602,16 +606,26 @@ nav{padding:8px 0;flex:1;overflow-y:auto;}
             </select>
           </div>
         </div>
-        <div class="form-group" style="margin-bottom:18px">
-          <label class="form-label">Texto del ensayo (pegado desde PDF)</label>
-          <textarea id="subir-texto" class="notes-area" style="min-height:280px" placeholder="Pega aquí el texto completo del ensayo. Asegúrate de incluir tanto las preguntas como la clave de respuestas (al final o junto a cada pregunta). La IA SOLO usará las claves que encuentre en el texto — nunca inventará respuestas."></textarea>
+        <div class="subir-two-col" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px">
+          <div class="form-group">
+            <label class="form-label">Texto del ensayo (markitdown / texto puro)</label>
+            <textarea id="subir-texto" class="notes-area" style="min-height:300px" placeholder="Pega aquí el texto del ensayo convertido desde PDF (markitdown).&#10;&#10;Puede incluir #, tablas, '- N -' de páginas, 'FORMA 171', etc. — la IA filtrará la basura y omitirá las preguntas con gráficos.&#10;&#10;NO pongas el clavijero aquí; usa el campo de la derecha."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Clavijero (clave de respuestas)</label>
+            <textarea id="subir-clave" class="notes-area" style="min-height:300px" placeholder="Pega aquí la tabla de respuestas. Formato (columnas que se repiten):&#10;&#10;Nº  Clave   Nº  Clave   Nº  Clave&#10;1   A       28  C       55  B&#10;2   C       29  A       56  A&#10;...&#10;&#10;El parser lee TODOS los pares número→letra de la tabla, sin importar cuántas columnas haya." oninput="livePreviewClave()"></textarea>
+            <div id="subir-clave-badge" style="margin-top:6px;min-height:22px"></div>
+          </div>
         </div>
-        <button class="btn btn-primary btn-lg" id="btn-procesar" onclick="procesarEnsayo()">⚡ Procesar ensayo</button>
-        <div class="subir-progress-wrap hidden" id="subir-progress-wrap">
-          <div class="subir-progress-log" id="subir-progress-log"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px">
+          <button class="btn btn-primary btn-lg" id="btn-procesar" onclick="procesarEnsayo()">⚡ Procesar ensayo</button>
+          <button class="btn btn-secondary" id="btn-preview-clave" onclick="previewClavijero()">🔍 Verificar clave</button>
+        </div>
+        <div class="subir-progress-wrap hidden" id="subir-progress-wrap" style="margin-bottom:8px">
+          <div class="subir-progress-log" id="subir-progress-log" style="font-size:13px;color:var(--text2);margin-bottom:6px"></div>
           <div class="subir-progress-bar"><div class="subir-progress-fill" id="subir-progress-fill" style="width:0%"></div></div>
         </div>
-        <div id="subir-preview" style="margin-top:24px"></div>
+        <div id="subir-preview" style="margin-top:20px"></div>
       </div>
     </div>
     <div class="tab-pane" id="tab-subir-lista">
@@ -2504,29 +2518,66 @@ function setUserInfo(){
 }
 
 // ============================================================
-// SUBIR ENSAYO — PROCESAMIENTO Y GESTIÓN
+// SUBIR ENSAYO — CLAVIJERO, PROCESAMIENTO Y GESTIÓN
 // ============================================================
 function renderSubirEnsayo(){
-  // Restore form tab as active when navigating here
-  const formTab=document.getElementById('tab-subir-form');
-  const listaTab=document.getElementById('tab-subir-lista');
-  if(formTab&&listaTab){
-    document.querySelectorAll('#page-subir-ensayo .tab-pane').forEach(p=>p.classList.remove('active'));
-    document.querySelectorAll('#page-subir-ensayo .tab-btn').forEach(b=>b.classList.remove('active'));
-    formTab.classList.add('active');
-    document.getElementById('tab-btn-subir-form')?.classList.add('active');
+  document.querySelectorAll('#page-subir-ensayo .tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('#page-subir-ensayo .tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-subir-form')?.classList.add('active');
+  document.getElementById('tab-btn-subir-form')?.classList.add('active');
+}
+
+// Parse multi-column clavijero table → Map<pregNum, correctIdx 0-3>
+function parseClavijero(raw){
+  const map=new Map();
+  const re=/\b(\d{1,3})\s+([ABCDE])\b/gi;
+  let m;
+  while((m=re.exec(raw))!==null){
+    const num=parseInt(m[1],10);
+    const idx={A:0,B:1,C:2,D:3,E:3}[m[2].toUpperCase()];
+    if(idx!==undefined&&num>=1&&num<=200)map.set(num,idx);
   }
+  return map;
+}
+
+function livePreviewClave(){
+  const raw=document.getElementById('subir-clave')?.value||'';
+  const badge=document.getElementById('subir-clave-badge');
+  if(!badge)return;
+  if(raw.trim().length<4){badge.innerHTML='';return;}
+  const map=parseClavijero(raw);
+  if(!map.size){badge.innerHTML='<span class="clave-verify-badge warn">⚠️ Sin pares detectados</span>';return;}
+  const nums=Array.from(map.keys()).sort((a,b)=>a-b);
+  badge.innerHTML=`<span class="clave-verify-badge ok">✓ ${map.size} preguntas en clave (${nums[0]}–${nums[nums.length-1]})</span>`;
+}
+
+function previewClavijero(){
+  const raw=document.getElementById('subir-clave')?.value||'';
+  if(!raw.trim()){showNotif('Clave vacía','Pega el clavijero primero','error');return;}
+  const map=parseClavijero(raw);
+  if(!map.size){showNotif('Formato no reconocido','No se encontraron pares número→letra. Revisa el formato.','error');return;}
+  const nums=Array.from(map.keys()).sort((a,b)=>a-b);
+  const letras=['A','B','C','D'];
+  const sample=nums.slice(0,15).map(n=>`${n}:${letras[map.get(n)]}`).join('  ');
+  const badge=document.getElementById('subir-clave-badge');
+  if(badge)badge.innerHTML=`<span class="clave-verify-badge ok">✓ ${map.size} pares detectados (preg. ${nums[0]}–${nums[nums.length-1]})</span>`;
+  showNotif('Clave verificada',`${map.size} preguntas · Ej: ${sample.substring(0,80)}...`,'success');
 }
 
 async function procesarEnsayo(){
   const texto=document.getElementById('subir-texto')?.value.trim();
+  const rawClave=document.getElementById('subir-clave')?.value.trim();
   const prueba=document.getElementById('subir-prueba')?.value||'M1';
   const nombre=(document.getElementById('subir-nombre')?.value.trim())||`Ensayo ${prueba} ${new Date().toLocaleDateString('es-CL')}`;
 
-  if(!texto||texto.length<100){showNotif('Texto vacío','Pega el texto completo del ensayo primero','error');return;}
+  if(!texto||texto.length<50){showNotif('Texto vacío','Pega el texto del ensayo primero','error');return;}
+  if(!rawClave||rawClave.length<3){showNotif('Clave vacía','Pega el clavijero (clave de respuestas) primero','error');return;}
 
-  const btn=document.getElementById('btn-procesar');
-  if(btn)btn.disabled=true;
+  const claveMap=parseClavijero(rawClave);
+  if(!claveMap.size){showNotif('Clave inválida','No se encontraron pares número→letra en el clavijero. Revisa el formato.','error');return;}
+
+  const btns=[document.getElementById('btn-procesar'),document.getElementById('btn-preview-clave')];
+  btns.forEach(b=>{if(b)b.disabled=true;});
   const wrapEl=document.getElementById('subir-progress-wrap');
   const logEl=document.getElementById('subir-progress-log');
   const fillEl=document.getElementById('subir-progress-fill');
@@ -2534,106 +2585,160 @@ async function procesarEnsayo(){
   if(wrapEl)wrapEl.classList.remove('hidden');
   if(previewEl)previewEl.innerHTML='';
 
-  const BLOCK=15;
-  const MAX_Q=80;
-  let allQuestions=[];
+  const claveNums=Array.from(claveMap.keys()).sort((a,b)=>a-b);
+  const minQ=claveNums[0]||1;
+  const maxQ=claveNums[claveNums.length-1]||80;
+  const BLOCK=18;
+  let allExtracted=[];
   let emptyBlocks=0;
 
   const setLog=(msg,pct)=>{
     if(logEl)logEl.textContent=msg;
-    if(fillEl)fillEl.style.width=pct+'%';
+    if(fillEl)fillEl.style.width=Math.max(0,Math.min(100,pct))+'%';
   };
 
-  for(let start=1;start<=MAX_Q;start+=BLOCK){
-    const end=Math.min(start+BLOCK-1,MAX_Q);
-    const blockPct=Math.round((start/MAX_Q)*90);
-    setLog(`Procesando preguntas ${start}–${end}...`,blockPct);
+  setLog(`Clave: ${claveMap.size} entradas (preg. ${minQ}–${maxQ}). Iniciando extracción...`,5);
+  await new Promise(r=>setTimeout(r,200));
 
-    const sysPrompt=`Eres un extractor de preguntas de ensayos PAES chilenos. Tu tarea es extraer preguntas del texto dado y devolver SOLO un array JSON.
+  const SYS=`Eres un extractor de preguntas de ensayos PAES chilenos a partir de texto markitdown.
 
-REGLAS CRÍTICAS (no negociables):
-1. Usa ÚNICAMENTE la clave de respuestas que aparece en el texto. NUNCA adivines, resuelvas ni inventes la respuesta correcta.
-2. Si no encuentras la respuesta correcta de una pregunta en la clave, omite esa pregunta del output.
-3. Si hay explicación literal en el texto para la pregunta, inclúyela en "explanation". Si no la hay, deja "explanation": "".
-4. Devuelve ÚNICAMENTE un array JSON válido entre corchetes [], sin texto adicional, sin markdown.
-5. Extrae SOLO las preguntas numeradas del ${start} al ${end}.
-6. Si no hay preguntas en ese rango, devuelve exactamente: []
+REGLAS ESTRICTAS:
+1. Extrae SOLO preguntas con TEXTO PURO: enunciado + exactamente 4 alternativas A, B, C, D en texto legible.
+2. Pon "grafico":true (y omite la pregunta del procesamiento) si:
+   - El enunciado menciona un gráfico, figura, imagen, diagrama, tabla o referencia visual ("¿cuál de los siguientes gráficos...?").
+   - Alguna alternativa muestra texto invertido/roto (ej: "arutarepmeT", fragmentos sin sentido), solo números sueltos, o depende de una imagen.
+   - Las alternativas son solo fórmulas/símbolos sin texto acompañante.
+3. CONSERVA el número original de la pregunta (campo "numero"). No renumeres.
+4. Ignora ruido de markitdown: "- N -" (páginas), "FORMA NNN", registros de PI, encabezados de sección.
+5. NO inventes enunciados, alternativas ni respuestas. NO incluyas campo "correct".
+6. Devuelve ÚNICAMENTE un array JSON, sin markdown ni texto extra.
+7. Extrae SOLO preguntas numeradas BLOCK_START a BLOCK_END. Si no hay, devuelve [].
 
-Estructura exacta de cada objeto JSON:
-{"stem":"enunciado completo de la pregunta","options":["opción A","opción B","opción C","opción D"],"correct":0,"explanation":""}
+Formato por objeto:
+{"numero":1,"stem":"enunciado","options":["alt A","alt B","alt C","alt D"],"grafico":false}`;
 
-Donde "correct" es el índice 0-3 (0=A, 1=B, 2=C, 3=D).`;
+  for(let start=minQ;start<=maxQ;start+=BLOCK){
+    const end=Math.min(start+BLOCK-1,maxQ);
+    const pct=Math.round(((start-minQ)/(maxQ-minQ+1))*80)+10;
+    setLog(`Procesando preguntas ${start}–${end}...`,pct);
 
     try{
       const resp=await fetch('/api/paes-ai',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
-          system:sysPrompt,
-          messages:[{role:'user',content:`TEXTO DEL ENSAYO:\n\n${texto}\n\n---\nExtrae SOLO las preguntas ${start} al ${end}. Responde únicamente con el array JSON.`}]
+          system:SYS.replace('BLOCK_START',start).replace('BLOCK_END',end),
+          messages:[{role:'user',content:`TEXTO:\n\n${texto}\n\n---\nExtrae preguntas ${start}–${end}. Solo array JSON.`}]
         })
       });
-      if(resp.status===429){setLog(`⚠️ Límite de API alcanzado. Guardando lo procesado hasta ahora...`,90);break;}
+      if(resp.status===429){setLog('⚠️ Límite API. Guardando progreso...',pct);break;}
       if(!resp.ok)throw new Error(`HTTP ${resp.status}`);
       const data=await resp.json();
       let raw=(data.text||'').trim();
-      // Extract JSON array from response (strip any surrounding text)
-      const m=raw.match(/\[[\s\S]*\]/);
-      if(m)raw=m[0];
+      const mj=raw.match(/\[[\s\S]*\]/);if(mj)raw=mj[0];
       const parsed=JSON.parse(raw);
       if(!Array.isArray(parsed)||!parsed.length){emptyBlocks++;if(emptyBlocks>=2)break;continue;}
       emptyBlocks=0;
-      const stamped=parsed.filter(q=>
-        q&&typeof q.stem==='string'&&Array.isArray(q.options)&&q.options.length===4&&typeof q.correct==='number'
-      ).map((q,i)=>({...q,id:`subido_${Date.now()}_${start+i}`,correct:Math.min(3,Math.max(0,Math.round(q.correct)))}));
-      allQuestions=allQuestions.concat(stamped);
-      setLog(`✓ ${allQuestions.length} preguntas extraídas hasta ahora...`,blockPct);
+      const valid=parsed.filter(q=>
+        q&&typeof q.numero==='number'&&typeof q.stem==='string'&&
+        Array.isArray(q.options)&&q.options.length===4
+      );
+      allExtracted=allExtracted.concat(valid);
+      const matched=valid.filter(q=>!q.grafico&&claveMap.has(q.numero)).length;
+      setLog(`✓ ${allExtracted.length} preg. extraídas · ${matched} con clave en este bloque`,pct);
     }catch(e){
-      setLog(`⚠️ Error en bloque ${start}-${end} (${e.message}). Continuando...`,blockPct);
+      setLog(`⚠️ Error bloque ${start}-${end} (${e.message}). Continuando...`,pct);
     }
-    // Brief pause between API calls
-    if(start+BLOCK<=MAX_Q)await new Promise(r=>setTimeout(r,600));
+    if(start+BLOCK<=maxQ)await new Promise(r=>setTimeout(r,600));
   }
 
-  if(btn)btn.disabled=false;
+  btns.forEach(b=>{if(b)b.disabled=false;});
+  setLog('Emparejando con clavijero...',92);
 
-  if(!allQuestions.length){
-    setLog('⚠️ No se extrajeron preguntas. Verifica que el texto incluya preguntas numeradas y una clave de respuestas.',0);
+  // ── Emparejado ──────────────────────────────────────────────
+  const letras=['A','B','C','D'];
+  const finalQuestions=[];
+  const omitidosGrafico=[];
+  const omitidosSinClave=[];
+
+  allExtracted.forEach(q=>{
+    if(q.grafico){omitidosGrafico.push(q.numero);return;}
+    if(!claveMap.has(q.numero)){omitidosSinClave.push(q.numero);return;}
+    finalQuestions.push({
+      id:`subido_${Date.now()}_${q.numero}`,
+      numero:q.numero,
+      stem:q.stem,
+      options:q.options,
+      correct:claveMap.get(q.numero),
+      explanation:''
+    });
+  });
+  // Sort by original question number
+  finalQuestions.sort((a,b)=>a.numero-b.numero);
+
+  setLog(`✅ Listo. ${finalQuestions.length} guardadas · ${omitidosGrafico.length} omit. gráfico · ${omitidosSinClave.length} sin clave.`,100);
+
+  if(!finalQuestions.length){
+    setLog('⚠️ No quedaron preguntas. Verifica el texto y el clavijero.',0);
     if(fillEl)fillEl.style.width='0%';
     return;
   }
 
-  setLog(`✅ ¡Listo! ${allQuestions.length} preguntas extraídas.`,100);
-
-  // Save to state
-  const ensayo={id:'ens_'+Date.now(),nombre,prueba,fecha:new Date().toLocaleDateString('es-CL'),preguntas:allQuestions};
+  const ensayo={
+    id:'ens_'+Date.now(),
+    nombre,prueba,
+    fecha:new Date().toLocaleDateString('es-CL'),
+    preguntas:finalQuestions,
+    stats:{extraidas:allExtracted.length,omitidosGrafico,omitidosSinClave}
+  };
   state.ensayosSubidos.push(ensayo);
   saveState();
 
-  showNotif('¡Ensayo procesado!',`${allQuestions.length} preguntas guardadas como "${nombre}"${allQuestions.length<5?' · Pocas preguntas extraídas, revisa la clave de respuestas':''}`,allQuestions.length>=5?'success':'');
+  showNotif('¡Ensayo procesado!',`${finalQuestions.length} preguntas emparejadas con clavijero`,'success');
 
-  // Render preview (first 5 questions)
-  const preview=allQuestions.slice(0,5);
+  // ── Resultado ────────────────────────────────────────────────
+  const prev=finalQuestions.slice(0,4);
   previewEl.innerHTML=`
     <div class="card" style="margin-bottom:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
         <div>
           <div style="font-family:var(--font-head);font-size:16px;font-weight:700">${nombre}</div>
-          <div style="font-size:12px;color:var(--text3);margin-top:2px">${prueba} · ${allQuestions.length} preguntas · ${new Date().toLocaleDateString('es-CL')}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">${prueba} · ${finalQuestions.length} preguntas · ${new Date().toLocaleDateString('es-CL')}</div>
         </div>
-        <button class="btn btn-primary btn-sm" onclick="navigate('practice')">→ Practicar ahora</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="practicarEnsayoSubido('${ensayo.id}')">✏️ Practicar</button>
+          <button class="btn btn-secondary btn-sm" onclick="startEssayFromSubido('${ensayo.id}')">📝 Mini-ensayo</button>
+        </div>
       </div>
-      <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:10px">Vista previa (primeras ${preview.length})</div>
-      ${preview.map((q,i)=>`
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px">
+        <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;text-align:center">
+          <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--green)">${finalQuestions.length}</div>
+          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Guardadas</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;text-align:center">
+          <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--yellow)">${omitidosGrafico.length}</div>
+          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Omit. gráfico</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;text-align:center">
+          <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--text3)">${omitidosSinClave.length}</div>
+          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Sin clave</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;text-align:center">
+          <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--text2)">${claveMap.size}</div>
+          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">En clavijero</div>
+        </div>
+      </div>
+      ${omitidosGrafico.length?`<div style="font-size:12px;color:var(--yellow);margin-bottom:6px">🖼 Omitidas por gráfico/imagen: <strong>${omitidosGrafico.join(', ')}</strong></div>`:''}
+      ${omitidosSinClave.length?`<div style="font-size:12px;color:var(--text3);margin-bottom:10px">📋 Sin entrada en clavijero: ${omitidosSinClave.join(', ')}</div>`:''}
+      <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:10px">Vista previa (primeras ${prev.length})</div>
+      ${prev.map(q=>`
         <div class="preview-question">
-          <div class="pq-num">Pregunta ${i+1}</div>
-          <div class="pq-stem">${q.stem.length>140?q.stem.substring(0,140)+'…':q.stem}</div>
-          <div class="pq-correct">✓ Correcta: ${['A','B','C','D'][q.correct]}) ${(q.options[q.correct]||'').substring(0,60)}</div>
+          <div class="pq-num">Pregunta ${q.numero}</div>
+          <div class="pq-stem">${(q.stem||'').length>150?q.stem.substring(0,150)+'…':q.stem}</div>
+          <div class="pq-correct">✓ Clave: ${letras[q.correct]}) ${(q.options[q.correct]||'').substring(0,70)}</div>
         </div>`).join('')}
-      ${allQuestions.length>5?`<div style="font-size:12px;color:var(--text3);margin-top:8px">...y ${allQuestions.length-5} más guardadas.</div>`:''}
+      ${finalQuestions.length>4?`<div style="font-size:12px;color:var(--text3);margin-top:8px">...y ${finalQuestions.length-4} más guardadas.</div>`:''}
     </div>`;
-
-  // Refresh practice source selector if open
   updatePracticeSourceSelector();
 }
 
@@ -2651,9 +2756,11 @@ function renderEnsayosSubidos(){
       <div class="ensayo-subido-info">
         <div class="ensayo-subido-title">${e.nombre}</div>
         <div class="ensayo-subido-meta">${e.prueba} · ${e.preguntas.length} preguntas · ${e.fecha}</div>
+        ${e.stats?`<div style="font-size:11px;color:var(--text3);margin-top:2px">Omit. gráfico: ${e.stats.omitidosGrafico?.length||0} · Sin clave: ${e.stats.omitidosSinClave?.length||0}</div>`:''}
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-secondary btn-sm" onclick="practicarEnsayoSubido('${e.id}')">✏️ Practicar</button>
+        <button class="btn btn-ghost btn-sm" onclick="startEssayFromSubido('${e.id}')">📝 Mini-ensayo</button>
         <button class="btn btn-ghost btn-sm" onclick="deleteEnsayoSubido('${e.id}')">🗑</button>
       </div>
     </div>`).join('');
@@ -2661,12 +2768,40 @@ function renderEnsayosSubidos(){
 
 function practicarEnsayoSubido(id){
   navigate('practice');
-  // Wait for DOM to update, then set fuente
   setTimeout(()=>{
     updatePracticeSourceSelector();
     const sel=document.getElementById('practiceFuente');
     if(sel){sel.value=id;onPracticeFuenteChange();}
   },50);
+}
+
+function startEssayFromSubido(id){
+  const e=state.ensayosSubidos?.find(x=>x.id===id);
+  if(!e||!e.preguntas?.length){showNotif('Sin preguntas','Ensayo sin preguntas extraídas','error');return;}
+  openModal(`<h2>📝 ${e.nombre}</h2>
+    <p style="color:var(--text2);margin-bottom:16px">${e.preguntas.length} preguntas · ${e.prueba} · Sin tiempo límite</p>
+    <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:12px;margin-bottom:16px;font-size:13px;color:var(--text2)">
+      Se lanza como mini-ensayo. Puedes responder todas o las que quieras y entregar cuando lo decidas. Los errores se guardan en "Practicar Errores".
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="launchSubidoEssay('${id}')">🚀 Comenzar</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+    </div>`);
+}
+
+function launchSubidoEssay(id){
+  closeModal();
+  const e=state.ensayosSubidos?.find(x=>x.id===id);
+  if(!e)return;
+  const qs=e.preguntas.map(q=>({...q,_hard:false}));
+  essayState={questions:qs,answers:new Array(qs.length).fill(null),cur:0,startTime:Date.now(),
+    timer:null,type:'subido',totalTime:999*60,label:e.nombre,hardCount:0};
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-essay-active').classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('topbarTitle').textContent=e.nombre;
+  renderEssayQ();
+  essayState.timer=setInterval(()=>tickEssayTimer(),1000);
 }
 
 function deleteEnsayoSubido(id){
@@ -2675,7 +2810,7 @@ function deleteEnsayoSubido(id){
   saveState();
   renderEnsayosSubidos();
   updatePracticeSourceSelector();
-  showNotif('Ensayo eliminado','El ensayo fue removido de tu biblioteca','');
+  showNotif('Ensayo eliminado','Removido de tu biblioteca','');
 }
 
 // ============================================================
