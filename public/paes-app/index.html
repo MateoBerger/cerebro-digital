@@ -218,7 +218,15 @@ nav{padding:8px 0;flex:1;overflow-y:auto;}
 .subject-icon-lg{font-size:40px;flex-shrink:0;}
 .subject-info h2{font-family:var(--font-head);font-size:20px;font-weight:800;margin-bottom:4px;}
 .subject-info p{color:var(--text2);font-size:14px;}
+/* ── REGISTRO DE ENSAYOS ─────────────────────────────────── */
+.ensayo-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.form-group{display:flex;flex-direction:column;gap:5px;}
+.form-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text3);}
+.ensayo-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:10px;transition:border-color .2s;}
+.ensayo-row:hover{border-color:var(--accent);}
+@media(max-width:600px){.ensayo-form-grid{grid-template-columns:1fr;}}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 </head>
 <body>
 <aside class="sidebar" id="sidebar">
@@ -250,6 +258,7 @@ nav{padding:8px 0;flex:1;overflow-y:auto;}
     <div class="nav-item" onclick="navigate('mathTips')"><span class="nav-icon">💡</span>Tips Matemáticas</div>
     <div class="nav-section">Evaluación</div>
     <div class="nav-item" onclick="navigate('essays')"><span class="nav-icon">📝</span>Ensayos</div>
+    <div class="nav-item" onclick="navigate('registro')"><span class="nav-icon">📋</span>Mis Ensayos</div>
     <div class="nav-item" onclick="navigate('upload')"><span class="nav-icon">📤</span>Subir Guía</div>
     <div class="nav-item" onclick="navigate('download')"><span class="nav-icon">⬇️</span>Descargar PDF</div>
     <div class="nav-section">Personal</div>
@@ -460,6 +469,83 @@ nav{padding:8px 0;flex:1;overflow-y:auto;}
     </div>
     <h3 style="font-family:var(--font-head);font-size:15px;font-weight:700;margin-bottom:12px">Historial</h3>
     <div id="essayHistory"></div>
+  </section>
+
+  <!-- REGISTRO DE ENSAYOS -->
+  <section class="page" id="page-registro">
+    <div class="section-header">
+      <h2>📋 Mis Ensayos</h2>
+      <p>Registra y analiza los resultados de tus ensayos PAES de colegio, preu, CyC o DEMRE.</p>
+    </div>
+
+    <!-- Stats dinámicas -->
+    <div id="ensayosStats"></div>
+
+    <!-- Formulario -->
+    <div class="card" style="max-width:700px;margin-bottom:28px">
+      <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:18px;color:var(--accent)">+ Registrar ensayo nuevo</h3>
+      <div class="ensayo-form-grid">
+        <div class="form-group">
+          <label class="form-label">Fecha</label>
+          <input type="date" id="ensayo-fecha" class="ai-input" style="width:100%">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Prueba</label>
+          <select id="ensayo-prueba" class="ai-input" style="width:100%">
+            <option value="M1">M1 — Matemática 1</option>
+            <option value="M2">M2 — Matemática 2</option>
+            <option value="C. Lectora">C. Lectora — Competencia Lectora</option>
+            <option value="Ciencias">Ciencias</option>
+            <option value="Historia">Historia y Cs. Sociales</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Origen / Lugar</label>
+          <input type="text" id="ensayo-origen" class="ai-input" style="width:100%" placeholder="CyC, Colegio, Jano, DEMRE...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tipo</label>
+          <select id="ensayo-tipo" class="ai-input" style="width:100%">
+            <option value="completo">Ensayo completo</option>
+            <option value="mini">Mini-ensayo</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Puntaje (100–1000)</label>
+          <input type="number" id="ensayo-puntaje" class="ai-input" style="width:100%" min="100" max="1000" placeholder="720">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Respuestas buenas</label>
+          <input type="number" id="ensayo-buenas" class="ai-input" style="width:100%" min="0" placeholder="45">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Respuestas malas</label>
+          <input type="number" id="ensayo-malas" class="ai-input" style="width:100%" min="0" placeholder="8">
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label class="form-label">Temas a repasar (opcional)</label>
+          <input type="text" id="ensayo-temas" class="ai-input" style="width:100%" placeholder="Ej: Álgebra, Probabilidad, Texto argumentativo...">
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label class="form-label">Comentarios (opcional)</label>
+          <textarea id="ensayo-comentarios" class="notes-area" style="min-height:80px" placeholder="Qué salió bien, qué mejorar, condiciones del ensayo..."></textarea>
+        </div>
+      </div>
+      <div style="margin-top:16px">
+        <button class="btn btn-primary" onclick="addEnsayoForm()">Guardar ensayo</button>
+      </div>
+    </div>
+
+    <!-- Gráfico de evolución -->
+    <div class="card" style="margin-bottom:28px">
+      <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:16px">Evolución de puntajes</h3>
+      <div id="ensayoChartEmpty" style="color:var(--text3);font-size:13px;padding:16px 0;display:none">Sin datos aún. Registra tu primer ensayo arriba.</div>
+      <canvas id="ensayoChart" style="max-height:320px"></canvas>
+    </div>
+
+    <!-- Lista de ensayos -->
+    <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px">Historial de ensayos</h3>
+    <div id="ensayosList"></div>
   </section>
 
   <!-- ESSAY ACTIVE -->
@@ -925,10 +1011,12 @@ let state=JSON.parse(localStorage.getItem('paes_v3')||'null')||{
   errors:[],history:[],
   vocab:{lastWordDate:null,learnedToday:false,currentPos:0,learnedWords:[],seed:Math.random()},
   progress:{},wordBank:[],books:[],uploadedFiles:[],
-  practiceRateLimit:{},seenExIds:new Set()
+  practiceRateLimit:{},seenExIds:new Set(),ensayosRegistro:[]
 };
 // Convert seenExIds from array if loaded from JSON
 if(Array.isArray(state.seenExIds)) state.seenExIds=new Set(state.seenExIds);
+// Migración: usuarios existentes no tienen ensayosRegistro
+if(!state.ensayosRegistro)state.ensayosRegistro=[];
 
 function saveState(){
   const toSave={...state,seenExIds:[...state.seenExIds]};
@@ -965,7 +1053,7 @@ function navigate(page){
   if(pageEl)pageEl.classList.add('active');
   const navEl=document.querySelector(`.nav-item[onclick="navigate('${page}')"]`);
   if(navEl)navEl.classList.add('active');
-  const titles={home:'Inicio',tutor:'Tutor IA',guides:'Guías',practice:'Práctica Rápida',errors:'Practicar Errores',vocab:'Vocabulario',wordbank:'Banco de Palabras',mathTips:'Tips Matemáticas',dato:'Dato del Día',essays:'Ensayos',progress:'Mi Progreso',books:'Mis Libros',upload:'Subir Guía',download:'Descargar PDF',admin:'Panel Admin','guide-detail':'Guías'};
+  const titles={home:'Inicio',tutor:'Tutor IA',guides:'Guías',practice:'Práctica Rápida',errors:'Practicar Errores',vocab:'Vocabulario',wordbank:'Banco de Palabras',mathTips:'Tips Matemáticas',dato:'Dato del Día',essays:'Ensayos',registro:'Mis Ensayos',progress:'Mi Progreso',books:'Mis Libros',upload:'Subir Guía',download:'Descargar PDF',admin:'Panel Admin','guide-detail':'Guías'};
   document.getElementById('topbarTitle').textContent=titles[page]||page;
   if(page==='home')renderHome();
   if(page==='tutor')renderTutor();
@@ -982,6 +1070,7 @@ function navigate(page){
   if(page==='upload')renderUpload();
   if(page==='download')renderDownload();
   if(page==='admin')renderAdmin();
+  if(page==='registro')renderRegistro();
 }
 
 // ============================================================
@@ -2147,6 +2236,142 @@ function openModal(html){document.getElementById('modalContent').innerHTML=html;
 function closeModal(){document.getElementById('modalOverlay').classList.remove('open');}
 function switchTab(tabId,btn){document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));btn.classList.add('active');document.getElementById(tabId)?.classList.add('active');}
 function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');}
+
+// ============================================================
+// REGISTRO DE ENSAYOS
+// ============================================================
+function renderRegistro(){
+  if(!state.ensayosRegistro)state.ensayosRegistro=[];
+  renderEnsayosStats();
+  renderEnsayosList();
+  renderEnsayoChart();
+}
+
+function renderEnsayosStats(){
+  const el=document.getElementById('ensayosStats');
+  if(!el)return;
+  const all=state.ensayosRegistro||[];
+  if(!all.length){el.innerHTML='';return;}
+  const byPrueba={};
+  all.forEach(e=>{if(!byPrueba[e.prueba])byPrueba[e.prueba]=[];byPrueba[e.prueba].push(e.puntaje);});
+  const overallAvg=Math.round(all.reduce((s,e)=>s+e.puntaje,0)/all.length);
+  const overallMax=Math.max(...all.map(e=>e.puntaje));
+  let html=`<div class="stats-row" style="margin-bottom:20px">
+    <div class="stat-card stat-blue"><div class="stat-num">${all.length}</div><div class="stat-lbl">Total ensayos</div></div>
+    <div class="stat-card stat-yellow"><div class="stat-num">${overallAvg}</div><div class="stat-lbl">Promedio global</div></div>
+    <div class="stat-card stat-green"><div class="stat-num">${overallMax}</div><div class="stat-lbl">Máximo global</div></div>`;
+  Object.entries(byPrueba).forEach(([p,pts])=>{
+    const avg=Math.round(pts.reduce((a,b)=>a+b,0)/pts.length);
+    const max=Math.max(...pts);
+    html+=`<div class="stat-card"><div class="stat-num" style="font-size:20px;color:var(--accent)">${avg}</div><div class="stat-lbl">${p} promedio</div></div>
+           <div class="stat-card"><div class="stat-num" style="font-size:20px;color:var(--green)">${max}</div><div class="stat-lbl">${p} máximo</div></div>`;
+  });
+  el.innerHTML=html+'</div>';
+}
+
+function renderEnsayosList(){
+  const container=document.getElementById('ensayosList');
+  if(!container)return;
+  const ensayos=[...(state.ensayosRegistro||[])].sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.creadoEn-a.creadoEn);
+  if(!ensayos.length){container.innerHTML='<p style="color:var(--text3);font-size:13px;padding:12px 0">Aún no has registrado ningún ensayo. ¡Usa el formulario de arriba!</p>';return;}
+  const pruebaTag={M1:'tag-blue',M2:'tag-purple','C. Lectora':'tag-green',Ciencias:'tag-yellow',Historia:'tag-orange'};
+  container.innerHTML=ensayos.map(e=>{
+    const scoreClass=e.puntaje>=700?'score-good':e.puntaje>=550?'score-mid':'score-bad';
+    const totalR=(e.buenas||0)+(e.malas||0);
+    const pct=totalR>0?Math.round((e.buenas||0)/totalR*100):0;
+    const tipoTag=e.tipo==='completo'?'<span class="tag tag-blue">Completo</span>':'<span class="tag tag-purple">Mini</span>';
+    const prTag=`<span class="tag ${pruebaTag[e.prueba]||'tag-blue'}">${e.prueba}</span>`;
+    return`<div class="ensayo-row">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+            ${prTag}${tipoTag}
+            <span style="font-size:12px;color:var(--text3);font-family:monospace">${e.fecha}</span>
+            <span style="font-size:12px;color:var(--text2)">· ${e.origen}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+            <span class="${scoreClass}" style="font-family:var(--font-head);font-size:28px;font-weight:800">${e.puntaje} pts</span>
+            <div style="font-size:13px;color:var(--text2)">
+              <span style="color:var(--green)">✓ ${e.buenas||0}</span>
+              <span style="margin:0 6px;color:var(--text3)">·</span>
+              <span style="color:var(--red)">✗ ${e.malas||0}</span>
+              ${totalR>0?`<span style="margin:0 6px;color:var(--text3)">·</span><span style="color:var(--text2)">${pct}% logro</span>`:''}
+            </div>
+          </div>
+          ${e.temas?`<div style="font-size:12px;color:var(--yellow);margin-top:6px">📌 Repasar: ${e.temas}</div>`:''}
+          ${e.comentarios?`<div style="font-size:12px;color:var(--text2);margin-top:5px;line-height:1.5">${e.comentarios}</div>`:''}
+        </div>
+        <button onclick="deleteEnsayo('${e.id}')" title="Eliminar" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:4px;flex-shrink:0;transition:color .15s" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text3)'">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+const ENSAYO_CHART_COLORS={M1:'#4f7cff',M2:'#7c4fff','C. Lectora':'#2dcc7e',Ciencias:'#ffcc4f',Historia:'#ff6b4f'};
+
+function renderEnsayoChart(){
+  const canvas=document.getElementById('ensayoChart');
+  const empty=document.getElementById('ensayoChartEmpty');
+  if(!canvas)return;
+  if(window._ensayoChartInst){window._ensayoChartInst.destroy();window._ensayoChartInst=null;}
+  const raw=[...(state.ensayosRegistro||[])].sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  if(!raw.length||typeof Chart==='undefined'){
+    canvas.style.display='none';
+    if(empty)empty.style.display='block';
+    return;
+  }
+  canvas.style.display='block';
+  if(empty)empty.style.display='none';
+  const allDates=[...new Set(raw.map(e=>e.fecha))].sort();
+  const pruebas=[...new Set(raw.map(e=>e.prueba))];
+  const datasets=pruebas.map(p=>{
+    const map={};raw.filter(e=>e.prueba===p).forEach(e=>{map[e.fecha]=e.puntaje;});
+    return{label:p,data:allDates.map(d=>map[d]??null),borderColor:ENSAYO_CHART_COLORS[p]||'#4f7cff',
+      backgroundColor:'transparent',tension:0.3,pointRadius:5,pointHoverRadius:7,spanGaps:true,borderWidth:2};
+  });
+  window._ensayoChartInst=new Chart(canvas,{
+    type:'line',data:{labels:allDates,datasets},
+    options:{
+      responsive:true,
+      plugins:{
+        legend:{labels:{color:'#8891a8',font:{family:'DM Sans',size:12}}},
+        tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y} pts`}},
+      },
+      scales:{
+        x:{ticks:{color:'#8891a8',maxTicksLimit:10},grid:{color:'#1a1e28'}},
+        y:{min:100,max:1000,ticks:{color:'#8891a8',stepSize:100},grid:{color:'#1a1e28'}},
+      },
+    },
+  });
+}
+
+function addEnsayoForm(){
+  const fecha=document.getElementById('ensayo-fecha').value;
+  const prueba=document.getElementById('ensayo-prueba').value;
+  const origen=document.getElementById('ensayo-origen').value.trim();
+  const puntaje=parseInt(document.getElementById('ensayo-puntaje').value);
+  const buenas=parseInt(document.getElementById('ensayo-buenas').value)||0;
+  const malas=parseInt(document.getElementById('ensayo-malas').value)||0;
+  const tipo=document.getElementById('ensayo-tipo').value;
+  const temas=document.getElementById('ensayo-temas').value.trim();
+  const comentarios=document.getElementById('ensayo-comentarios').value.trim();
+  if(!fecha||!origen||isNaN(puntaje)){showNotif('Faltan campos','Completa fecha, origen y puntaje','error');return;}
+  if(puntaje<100||puntaje>1000){showNotif('Puntaje inválido','Debe estar entre 100 y 1000','error');return;}
+  if(!state.ensayosRegistro)state.ensayosRegistro=[];
+  state.ensayosRegistro.push({id:'er_'+Date.now(),fecha,prueba,origen,puntaje,buenas,malas,tipo,temas,comentarios,creadoEn:Date.now()});
+  saveState();
+  ['ensayo-fecha','ensayo-origen','ensayo-puntaje','ensayo-buenas','ensayo-malas','ensayo-temas','ensayo-comentarios'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  renderRegistro();
+  showNotif('¡Guardado! 📋',`${prueba} · ${puntaje} pts desde ${origen}`,'success');
+}
+
+function deleteEnsayo(id){
+  if(!state.ensayosRegistro)return;
+  state.ensayosRegistro=state.ensayosRegistro.filter(e=>e.id!==id);
+  saveState();renderRegistro();
+  showNotif('Eliminado','Ensayo borrado del historial');
+}
+
 function showNotif(title,text,type=''){
   const n=document.getElementById('notification');
   document.getElementById('notifTitle').textContent=title;
