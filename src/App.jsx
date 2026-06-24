@@ -13,6 +13,7 @@ import CalendarioTab  from './components/CalendarioTab'
 import PAESTab        from './components/PAESTab'
 import AsistenteTab   from './components/AsistenteTab'
 import FloatingChat   from './components/FloatingChat'
+import NotifPrompt    from './components/NotifPrompt'
 
 function PlaceholderTab({ name }) {
   return (
@@ -77,6 +78,7 @@ export default function App() {
         {tab === 'asistente'  && <AsistenteTab uid={user.uid} />}
       </div>
       {tab !== 'asistente' && <FloatingChat uid={user.uid} />}
+      <NotifPrompt uid={user.uid} />
     </div>
   )
 }
