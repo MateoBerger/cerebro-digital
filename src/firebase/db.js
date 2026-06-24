@@ -1,5 +1,5 @@
 import {
-  collection, doc, getDocs, setDoc, updateDoc,
+  collection, doc, getDoc, getDocs, setDoc, updateDoc,
   deleteDoc, onSnapshot, serverTimestamp, writeBatch, addDoc, query, orderBy, limit,
   arrayUnion,
 } from 'firebase/firestore'
@@ -80,6 +80,15 @@ export function subscribeCheckin(uid, date, callback) {
   return onSnapshot(ref, snap => {
     callback(snap.exists() ? snap.data() : null)
   })
+}
+
+export async function getCheckinsWeek(uid, dates) {
+  const results = {}
+  await Promise.all(dates.map(async date => {
+    const snap = await getDoc(doc(db, 'users', uid, 'checkins', date))
+    results[date] = snap.exists() ? snap.data() : null
+  }))
+  return results
 }
 
 // ── TAREAS ───────────────────────────────────────────────
