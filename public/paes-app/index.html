@@ -128,9 +128,17 @@ nav{padding:8px 0;flex:1;overflow-y:auto;}
 .ai-chat-header{padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;}
 .ai-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;}
 .ai-messages{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;}
-.ai-msg{padding:10px 14px;border-radius:var(--radius-sm);max-width:92%;font-size:13px;line-height:1.65;white-space:pre-wrap;word-break:break-word;}
+.ai-msg{padding:10px 14px;border-radius:var(--radius-sm);max-width:92%;font-size:13px;line-height:1.75;white-space:pre-wrap;word-break:break-word;}
 .ai-msg.user{background:var(--accent);color:#fff;align-self:flex-end;}
 .ai-msg.ai{background:var(--surface);border:1px solid var(--border);color:var(--text);align-self:flex-start;}
+.ai-msg strong{color:var(--accent2);}
+.ai-step{color:var(--accent);font-weight:700;font-size:13.5px;display:block;margin-top:6px;margin-bottom:1px;}
+.ai-result{color:var(--green);font-weight:600;}
+.tutor-chat{display:flex;flex-direction:column;height:calc(100vh - 180px);max-width:800px;}
+.tutor-chat .ai-messages{flex:1;overflow-y:auto;}
+.tutor-intro{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;}
+.tutor-chip{padding:7px 14px;border-radius:100px;background:var(--surface2);border:1px solid var(--border);font-size:12px;font-weight:500;cursor:pointer;transition:all .2s;color:var(--text2);}
+.tutor-chip:hover{border-color:var(--accent);color:var(--accent);background:var(--glow);}
 .ai-input-row{display:flex;gap:8px;padding:10px;border-top:1px solid var(--border);background:var(--surface);}
 .ai-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;}
 .ai-input:focus{border-color:var(--accent);}
@@ -232,6 +240,7 @@ nav{padding:8px 0;flex:1;overflow-y:auto;}
     <div class="nav-item" onclick="navigate('progress')"><span class="nav-icon">📊</span>Mi Progreso</div>
     <div class="nav-item" onclick="navigate('dato')"><span class="nav-icon">🧠</span>Dato del Día</div>
     <div class="nav-section">Estudio</div>
+    <div class="nav-item" onclick="navigate('tutor')"><span class="nav-icon">🤖</span>Tutor IA</div>
     <div class="nav-item" onclick="navigate('guides')"><span class="nav-icon">📚</span>Guías de Estudio</div>
     <div class="nav-item" onclick="navigate('practice')"><span class="nav-icon">✏️</span>Práctica Rápida</div>
     <div class="nav-item" onclick="navigate('errors')"><span class="nav-icon">🎯</span>Practicar Errores</div>
@@ -544,6 +553,32 @@ nav{padding:8px 0;flex:1;overflow-y:auto;}
       <div id="adminStats"></div>
     </div>
     <div id="adminContent"></div>
+  </section>
+
+  <!-- TUTOR IA -->
+  <section class="page" id="page-tutor">
+    <div class="section-header" style="margin-bottom:12px">
+      <h2>🤖 Tutor IA</h2>
+      <p>Pregúntame cualquier cosa sobre la PAES: matemáticas, lenguaje, ciencias, estrategias de resolución.</p>
+    </div>
+    <div class="tutor-intro" id="tutorChips">
+      <span class="tutor-chip" onclick="tutorQuick('¿Cómo factorizo una expresión cuadrática?')">Factorización</span>
+      <span class="tutor-chip" onclick="tutorQuick('¿Qué es la función lineal y cómo graficarla?')">Función lineal</span>
+      <span class="tutor-chip" onclick="tutorQuick('Explícame la idea principal en un texto argumentativo')">Texto argumentativo</span>
+      <span class="tutor-chip" onclick="tutorQuick('¿Cuáles son los tips más importantes para la PAES?')">Tips PAES</span>
+      <span class="tutor-chip" onclick="tutorQuick('¿Cómo resolver un sistema de ecuaciones 2×2?')">Sistemas ecuaciones</span>
+      <span class="tutor-chip" onclick="tutorQuick('¿Qué es la célula y cuáles son sus partes principales?')">Biología básica</span>
+    </div>
+    <div class="ai-chat tutor-chat">
+      <div class="ai-chat-header"><div class="ai-dot"></div>Tutor PAES 2026 · IA disponible siempre</div>
+      <div class="ai-messages" id="tutorMessages">
+        <div class="ai-msg ai">¡Hola! Soy tu tutor para la PAES 2026. Puedo explicarte cualquier concepto paso a paso, resolver tus dudas de matemáticas, lenguaje o ciencias, y darte estrategias para el examen.<br><br>Elige un tema rápido arriba o escríbeme directamente. 🚀</div>
+      </div>
+      <div class="ai-input-row">
+        <input class="ai-input" id="tutorInputField" placeholder="¿Cómo resuelvo una ecuación de segundo grado?" onkeydown="if(event.key==='Enter')sendTutorAI()">
+        <button class="btn btn-primary btn-sm" onclick="sendTutorAI()">Enviar</button>
+      </div>
+    </div>
   </section>
 </main>
 
@@ -930,9 +965,10 @@ function navigate(page){
   if(pageEl)pageEl.classList.add('active');
   const navEl=document.querySelector(`.nav-item[onclick="navigate('${page}')"]`);
   if(navEl)navEl.classList.add('active');
-  const titles={home:'Inicio',guides:'Guías',practice:'Práctica Rápida',errors:'Practicar Errores',vocab:'Vocabulario',wordbank:'Banco de Palabras',mathTips:'Tips Matemáticas',dato:'Dato del Día',essays:'Ensayos',progress:'Mi Progreso',books:'Mis Libros',upload:'Subir Guía',download:'Descargar PDF',admin:'Panel Admin','guide-detail':'Guías'};
+  const titles={home:'Inicio',tutor:'Tutor IA',guides:'Guías',practice:'Práctica Rápida',errors:'Practicar Errores',vocab:'Vocabulario',wordbank:'Banco de Palabras',mathTips:'Tips Matemáticas',dato:'Dato del Día',essays:'Ensayos',progress:'Mi Progreso',books:'Mis Libros',upload:'Subir Guía',download:'Descargar PDF',admin:'Panel Admin','guide-detail':'Guías'};
   document.getElementById('topbarTitle').textContent=titles[page]||page;
   if(page==='home')renderHome();
+  if(page==='tutor')renderTutor();
   if(page==='guides')renderGuides();
   if(page==='practice')renderPracticeInit();
   if(page==='vocab')renderVocab();
@@ -1230,7 +1266,7 @@ function appendAIMsg(text,type){
   msgs?.appendChild(div);msgs?.scrollTo(0,msgs.scrollHeight);return id;
 }
 function renderMsg(raw){
-  // 1. Strip LaTeX
+  // 1. Strip LaTeX delimitadores y comandos
   let t=raw
     .replace(/\\\[[\s\S]*?\\\]/g,m=>m.replace(/\\\[|\\\]/g,'').trim())
     .replace(/\\\([\s\S]*?\\\)/g,m=>m.replace(/\\\(|\\\)/g,'').trim())
@@ -1242,21 +1278,87 @@ function renderMsg(raw){
     .replace(/\\\w+\b/g,'')
     .replace(/^#{1,6}\s+/gm,'')
     .trim();
-  // 2. Si el modelo metió todos los pasos en una línea con " - ", expandir a líneas reales
+  // 2. Expandir pasos empaquetados en una línea con " - "
   const nlCount=(t.match(/\n/g)||[]).length;
-  const dashCount=(t.match(/ - /g)||[]).length;
-  if(nlCount<3&&dashCount>=2)t=t.replace(/ - /g,'\n- ');
-  // 3. HTML-escape antes de agregar etiquetas (seguridad XSS)
+  if(nlCount<3&&(t.match(/ - /g)||[]).length>=2)t=t.replace(/ - /g,'\n- ');
+  // 3. HTML-escape PRIMERO (seguridad XSS, antes de agregar cualquier etiqueta)
   t=t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  // 4. Markdown básico: negrita y viñetas (líneas con "- ")
+  // 4. Potencias y subíndices → <sup>/<sub>
   t=t
-    .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
-    .replace(/__([^_]+)__/g,'<strong>$1</strong>')
-    .replace(/^- (.+)/gm,'• $1')
-    .replace(/\n/g,'<br>');
+    .replace(/\^\{([^}]+)\}/g,'<sup>$1</sup>')
+    .replace(/\^([a-zA-Z0-9]+)/g,'<sup>$1</sup>')
+    .replace(/_\{([^}]+)\}/g,'<sub>$1</sub>')
+    .replace(/_([0-9]+)\b/g,'<sub>$1</sub>');
+  // 5. Encabezados de paso → .ai-step (detectar antes de convertir bold)
+  t=t
+    .replace(/\*\*(Paso\s+\d+\s*[:.]?[^*\n]*)\*\*/gi,
+             '<span class="ai-step">$1</span>')
+    .replace(/^(?:[-•]\s*)?(Paso\s+\d+\s*[:.][ \t][^\n]+)/gmi,
+             '<span class="ai-step">$1</span>');
+  // 6. Conclusiones/resultados → .ai-result (verde)
+  t=t.replace(/\*\*((Resultado|Respuesta|Por lo tanto|En conclusión|∴)[^*\n]*)\*\*/gi,
+    '<strong class="ai-result">$1</strong>');
+  // 7. Bold restante → <strong> (coloreado por CSS como accent2)
+  t=t
+    .replace(/\*\*([^*\n]+)\*\*/g,'<strong>$1</strong>')
+    .replace(/__([^_\n]+)__/g,'<strong>$1</strong>');
+  // 8. Viñetas y saltos de línea
+  t=t.replace(/^- (.+)/gm,'• $1').replace(/\n/g,'<br>');
   return t;
 }
 function updateAIMsg(id,text){const el=document.getElementById(id);if(el){el.innerHTML=renderMsg(text);el.className='ai-msg ai';}}
+
+// ============================================================
+// TUTOR IA — chat general sin contexto de ejercicio
+// ============================================================
+let tutorHistory=[];
+let _tutorInitialized=false;
+
+function renderTutor(){
+  // Solo muestra los chips en la primera visita; luego se ocultan para dar más espacio
+  if(_tutorInitialized)document.getElementById('tutorChips').style.display='none';
+  _tutorInitialized=true;
+}
+
+function tutorQuick(msg){
+  document.getElementById('tutorChips').style.display='none';
+  document.getElementById('tutorInputField').value=msg;
+  sendTutorAI();
+}
+
+async function sendTutorAI(){
+  const input=document.getElementById('tutorInputField');
+  const msg=input?.value.trim();if(!msg)return;
+  input.value='';
+  document.getElementById('tutorChips').style.display='none';
+  appendTutorMsg(msg,'user');
+  const loadId=appendTutorMsg('Pensando...','ai');
+
+  const sysPrompt='Eres un tutor experto en PAES chilena 2026. Ayudas al estudiante con dudas de matemáticas, lenguaje, ciencias y estrategias de examen. Responde en español, siempre paso a paso, con ejemplos concretos y claros para enseñanza media chilena.';
+
+  try{
+    const resp=await fetch('/api/paes-ai',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({system:sysPrompt,messages:[...tutorHistory,{role:'user',content:msg}]})
+    });
+    if(resp.status===429){updateTutorMsg(loadId,'Demasiadas consultas. Espera unos segundos e intenta de nuevo.');return;}
+    if(!resp.ok)throw new Error(`HTTP ${resp.status}`);
+    const data=await resp.json();
+    const reply=data.text||'No pude responder. Intenta de nuevo.';
+    tutorHistory.push({role:'user',content:msg},{role:'assistant',content:reply});
+    if(tutorHistory.length>20)tutorHistory=tutorHistory.slice(-20);
+    updateTutorMsg(loadId,reply);
+  }catch(e){updateTutorMsg(loadId,'Error al conectar con el tutor IA. Intenta de nuevo.');}
+}
+
+function appendTutorMsg(text,type){
+  const msgs=document.getElementById('tutorMessages');
+  const id='t'+Date.now()+Math.random();
+  const div=document.createElement('div');div.className=`ai-msg ${type}`;div.id=id;div.textContent=text;
+  msgs?.appendChild(div);msgs?.scrollTo(0,msgs.scrollHeight);return id;
+}
+function updateTutorMsg(id,text){const el=document.getElementById(id);if(el){el.innerHTML=renderMsg(text);el.className='ai-msg ai';el.closest('.ai-messages')?.scrollTo(0,9999);}}
 
 // ============================================================
 // WORD LOOKUP (works in guides too - all text is selectable)
