@@ -1,10 +1,15 @@
 // Vercel Serverless — /api/chat
-// Asistente general: tareas y calendario via Groq (llama-3.1-8b-instant)
+// Asistente general: tareas y calendario via Cerebras (OpenAI-compatible)
 // Normaliza respuesta al formato {stop_reason, content:[...]} que consume useChat.js
 
-const MAX_HISTORY = 20
+const PROVIDER_URL  = 'https://api.cerebras.ai/v1/chat/completions'
+const PROVIDER_MODEL = 'gpt-oss-120b'
+const API_KEY_ENV    = 'CEREBRAS_API_KEY'
 
-// ── Herramientas Google Calendar (formato OpenAI/Groq) ─────────
+// Free tier ~8K tokens: 15 turnos de historial + system prompt largo ≈ 5-6K tokens
+const MAX_HISTORY = 15
+
+// ── Herramientas Google Calendar (formato OpenAI-compatible) ───
 const GCAL_TOOLS = [
   {
     type: 'function',
@@ -75,7 +80,7 @@ const GCAL_TOOLS = [
   },
 ]
 
-// ── Herramientas de tareas (formato OpenAI/Groq) ───────────────
+// ── Herramientas de tareas (formato OpenAI-compatible) ─────────
 const TOOLS = [
   {
     type: 'function',
@@ -146,8 +151,8 @@ const TOOLS = [
   },
 ]
 
-// ── Conversión mensajes frontend → Groq ───────────────────────
-function toGroqMessages(messages) {
+// ── Conversión mensajes frontend → formato OpenAI-compatible ───
+function toProviderMessages(messages) {
   const result = []
   for (const msg of messages) {
     if (typeof msg.content === 'string') {
@@ -156,15 +161,15 @@ function toGroqMessages(messages) {
       if (msg.role === 'assistant') {
         const textBlock  = msg.content.find(b => b.type === 'text')
         const toolBlocks = msg.content.filter(b => b.type === 'tool_use')
-        const groqMsg    = { role: 'assistant', content: textBlock?.text || null }
+        const aMsg       = { role: 'assistant', content: textBlock?.text || null }
         if (toolBlocks.length) {
-          groqMsg.tool_calls = toolBlocks.map(b => ({
+          aMsg.tool_calls = toolBlocks.map(b => ({
             id:   b.id,
             type: 'function',
             function: { name: b.name, arguments: JSON.stringify(b.input) },
           }))
         }
-        result.push(groqMsg)
+        result.push(aMsg)
       } else if (msg.role === 'user') {
         const toolResults = msg.content.filter(b => b.type === 'tool_result')
         for (const tr of toolResults) {
@@ -180,8 +185,8 @@ function toGroqMessages(messages) {
   return result
 }
 
-// ── Normalización respuesta Groq → formato interno ─────────────
-function normalizeGroqResponse(data) {
+// ── Normalización respuesta → formato interno ──────────────────
+function normalizeResponse(data) {
   const choice = data.choices?.[0]
   if (!choice) return { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Sin respuesta del modelo.' }] }
 
@@ -276,9 +281,9 @@ Nunca creés nada basándote en suposiciones.
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const key = process.env.GROQ_API_KEY
-  console.log('[chat] GROQ_API_KEY present:', !!key, '| length:', key?.length ?? 0)
-  if (!key) return res.status(500).json({ error: 'GROQ_API_KEY no configurada en Vercel' })
+  const key = process.env[API_KEY_ENV]
+  console.log(`[chat] ${API_KEY_ENV} present:`, !!key, '| length:', key?.length ?? 0)
+  if (!key) return res.status(500).json({ error: `${API_KEY_ENV} no configurada en Vercel` })
 
   const { messages, context, assistant_content, tool_results, gcal_token } = req.body
 
@@ -287,7 +292,7 @@ export default async function handler(req, res) {
   const firstUserIdx = raw.findIndex(m => m.role === 'user')
   const trimmed      = firstUserIdx > 0 ? raw.slice(firstUserIdx) : raw
 
-  let groqMessages = toGroqMessages(trimmed)
+  let providerMessages = toProviderMessages(trimmed)
 
   // Continuación post-tool-use: agregar turno del modelo + resultados
   if (assistant_content && tool_results?.length) {
@@ -301,9 +306,9 @@ export default async function handler(req, res) {
         function: { name: b.name, arguments: JSON.stringify(b.input) },
       }))
     }
-    groqMessages.push(assistantMsg)
+    providerMessages.push(assistantMsg)
     for (const tr of tool_results) {
-      groqMessages.push({
+      providerMessages.push({
         role:         'tool',
         tool_call_id: tr.tool_use_id,
         content:      String(tr.result),
@@ -311,25 +316,23 @@ export default async function handler(req, res) {
     }
   }
 
-  const groqBody = {
-    model:       'llama-3.1-8b-instant',
+  const requestBody = {
+    model:       PROVIDER_MODEL,
     max_tokens:  1024,
     temperature: 0.3,
     messages: [
       { role: 'system', content: buildSystemPrompt(context, !!gcal_token) },
-      ...groqMessages,
+      ...providerMessages,
     ],
     tools:       gcal_token ? [...TOOLS, ...GCAL_TOOLS] : TOOLS,
     tool_choice: 'auto',
   }
 
-  const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
-
-  async function callGroq() {
-    return fetch(GROQ_URL, {
+  async function callProvider() {
+    return fetch(PROVIDER_URL, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-      body:    JSON.stringify(groqBody),
+      body:    JSON.stringify(requestBody),
     })
   }
 
@@ -346,17 +349,17 @@ export default async function handler(req, res) {
   }
 
   // Log estructura del payload (sin contenido sensible)
-  console.log('[chat] groqBody diag: model=%s | msgs=%d | tools=%d | has_tool_results=%s',
-    groqBody.model,
-    groqBody.messages.length,
-    (groqBody.tools || []).length,
+  console.log('[chat] request: model=%s | msgs=%d | tools=%d | has_tool_results=%s',
+    requestBody.model,
+    requestBody.messages.length,
+    (requestBody.tools || []).length,
     !!(tool_results?.length)
   )
-  console.log('[chat] msg roles:', groqBody.messages.map(m => m.role).join(','))
+  console.log('[chat] msg roles:', requestBody.messages.map(m => m.role).join(','))
 
   try {
-    let response = await callGroq()
-    console.log('[chat] Groq status:', response.status)
+    let response = await callProvider()
+    console.log('[chat] provider status:', response.status)
 
     // 429 — rate limit
     if (response.status === 429) {
@@ -373,8 +376,8 @@ export default async function handler(req, res) {
       }
 
       await sleep(500)
-      response = await callGroq()
-      if (response.status === 429) { await sleep(2000); response = await callGroq() }
+      response = await callProvider()
+      if (response.status === 429) { await sleep(2000); response = await callProvider() }
       if (response.status === 429) {
         const d = await readJson(response)
         console.error('[chat] 429 persists:', JSON.stringify(d).slice(0, 400))
@@ -386,13 +389,13 @@ export default async function handler(req, res) {
       }
     }
 
-    // 5xx transitorios — reintentar igual
+    // 5xx transitorios — reintentar
     if (response.status === 500 || response.status === 502 || response.status === 503) {
       const snippet = (await response.text()).slice(0, 300)
       console.error(`[chat] ${response.status} transient:`, snippet)
       await sleep(500)
-      response = await callGroq()
-      if (response.status === 500 || response.status === 502 || response.status === 503) { await sleep(2000); response = await callGroq() }
+      response = await callProvider()
+      if (response.status === 500 || response.status === 502 || response.status === 503) { await sleep(2000); response = await callProvider() }
       if (response.status === 500 || response.status === 502 || response.status === 503) {
         return res.status(200).json({
           stop_reason: 'end_turn',
@@ -404,15 +407,14 @@ export default async function handler(req, res) {
     const data = await readJson(response)
     if (!response.ok) {
       const errMsg = data?.error?.message || data?.error?.code || JSON.stringify(data).slice(0, 400)
-      console.error('[chat] Groq error', response.status, JSON.stringify(data))
-      // Devolver 200 con mensaje visible en la UI para poder depurar sin acceso a Vercel logs
+      console.error('[chat] provider error', response.status, JSON.stringify(data))
       return res.status(200).json({
         stop_reason: 'end_turn',
-        content: [{ type: 'text', text: `⚠️ Groq ${response.status}: ${errMsg}` }],
-        _diag: { status: response.status, groq_error: data?.error || data },
+        content: [{ type: 'text', text: `⚠️ Error ${response.status}: ${errMsg}` }],
+        _diag: { status: response.status, provider_error: data?.error || data },
       })
     }
-    res.json(normalizeGroqResponse(data))
+    res.json(normalizeResponse(data))
   } catch (err) {
     console.error('[chat] fetch error:', err.message)
     res.status(500).json({ error: err.message })
