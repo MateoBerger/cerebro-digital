@@ -169,16 +169,22 @@ function PaesCountdown({ days }) {
   const urgent = days <= 30
   const soon   = days <= 90
   const color  = urgent ? 'var(--red)' : soon ? 'var(--amber)' : 'var(--blue)'
-  const bg     = urgent ? 'rgba(240,114,114,.07)' : soon ? 'rgba(240,167,64,.07)' : 'rgba(91,156,246,.07)'
+  const glow   = urgent ? 'rgba(221,144,121,.12)' : soon ? 'rgba(224,189,107,.12)' : 'rgba(143,180,217,.12)'
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      background: bg, border: `1px solid ${color}44`,
-      borderRadius: '10px', padding: '12px 18px', marginBottom: '20px',
+      background: `radial-gradient(ellipse at 10% 50%, ${glow} 0%, transparent 60%), linear-gradient(160deg, var(--bg3) 0%, var(--bg2) 100%)`,
+      border: `1px solid var(--accent-border)`,
+      borderRadius: 'var(--radius)', padding: '14px 22px', marginBottom: '20px',
+      boxShadow: '0 10px 30px -12px rgba(0,0,0,.55), 0 0 0 1px var(--accent-border)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <span style={{ fontSize: '20px' }}>🎯</span>
-        <span style={{ fontWeight: 700, fontSize: '24px', color }}>{days}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <span style={{ fontSize: '22px' }}>🎯</span>
+        <span style={{
+          fontWeight: 700, fontSize: '30px', color,
+          fontFamily: 'var(--font-display)', letterSpacing: '-.03em',
+          textShadow: `0 0 28px ${color}`,
+        }}>{days}</span>
         <span style={{ fontSize: '14px', color: 'var(--text1)' }}>
           {days === 1 ? 'día' : 'días'} para la PAES
         </span>
@@ -319,10 +325,20 @@ function WeekSummaryCard({ tareas, checkins }) {
 function StatCard({ label, value, color, suffix }) {
   return (
     <div className="card" style={{ padding: '16px 18px' }}>
-      <div style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.7px', color: 'var(--text2)', marginBottom: '8px' }}>
-        {label}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+        <div style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.7px', color: 'var(--text2)' }}>
+          {label}
+        </div>
+        <div style={{
+          width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+          background: color, boxShadow: `0 0 8px ${color}`,
+        }} />
       </div>
-      <div style={{ fontSize: '20px', fontWeight: 700, color, display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <div style={{
+        fontSize: '22px', fontWeight: 700, color,
+        fontFamily: 'var(--font-display)', letterSpacing: '-.02em',
+        display: 'flex', alignItems: 'center', gap: '6px',
+      }}>
         {value}
         {suffix && <span style={{ fontSize: '16px' }}>{suffix}</span>}
       </div>
