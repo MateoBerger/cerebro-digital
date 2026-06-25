@@ -14,6 +14,7 @@ import PAESTab        from './components/PAESTab'
 import AsistenteTab   from './components/AsistenteTab'
 import FloatingChat   from './components/FloatingChat'
 import NotifPrompt    from './components/NotifPrompt'
+import IntroAnimation from './components/IntroAnimation'
 
 function PlaceholderTab({ name }) {
   return (
@@ -57,6 +58,8 @@ export default function App() {
   if (!user) return <LoginPage onGcalToken={saveGcalToken} />
 
   return (
+    <>
+    <IntroAnimation user={user} />
     <div className="app-shell">
       <Sidebar
         collapsed={!sidebarOpen}
@@ -80,5 +83,6 @@ export default function App() {
       {tab !== 'asistente' && <FloatingChat uid={user.uid} />}
       <NotifPrompt uid={user.uid} />
     </div>
+    </>
   )
 }
