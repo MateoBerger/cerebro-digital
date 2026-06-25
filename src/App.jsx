@@ -15,6 +15,7 @@ import AsistenteTab   from './components/AsistenteTab'
 import FloatingChat   from './components/FloatingChat'
 import NotifPrompt    from './components/NotifPrompt'
 import IntroAnimation from './components/IntroAnimation'
+import LoadingScreen  from './components/LoadingScreen'
 
 function PlaceholderTab({ name }) {
   return (
@@ -28,6 +29,7 @@ function PlaceholderTab({ name }) {
 
 export default function App() {
   const [user, setUser]           = useState(undefined)
+  const [showLoading, setShowLoading] = useState(true)
   const [tab, setTab]             = useState('inicio')
   const [sidebarOpen, setSidebar] = useState(true)
   const [theme, setTheme]         = useState(() => localStorage.getItem('cd-theme') || 'dark')
@@ -40,20 +42,14 @@ export default function App() {
   }, [theme])
 
   useEffect(() => {
-    return onAuthStateChanged(auth, setUser)
+    return onAuthStateChanged(auth, (u) => {
+      setUser(u)
+      setTimeout(() => setShowLoading(false), 380)
+    })
   }, [])
 
 
-  if (user === undefined) {
-    return (
-      <div style={{
-        height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--bg0)', color: 'var(--text2)', fontSize: '13px',
-      }}>
-        Iniciando...
-      </div>
-    )
-  }
+  if (showLoading) return <LoadingScreen fading={user !== undefined} />
 
   if (!user) return <LoginPage onGcalToken={saveGcalToken} />
 
