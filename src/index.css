@@ -14,7 +14,7 @@
   --text2: #736c5e;
 
   --accent:        #e0bd6b;
-  --accent-dim:    #bd9748;
+  --accent-dim:    rgba(224,189,107,.16);
   --accent-border: rgba(224,189,107,.4);
 
   --blue:   #8fb4d9;
@@ -53,7 +53,7 @@
   --text2: #9c8868;
 
   --accent:        #a9802f;
-  --accent-dim:    #977025;
+  --accent-dim:    rgba(169,128,47,.14);
   --accent-border: rgba(169,128,47,.4);
 
   --green: #5f9466;
