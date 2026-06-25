@@ -323,18 +323,18 @@ function TareaItem({ tarea, onToggle, onEdit, onDelete }) {
       style={{
         display: 'flex', alignItems: 'flex-start', gap: '10px',
         padding: '12px 12px 12px 0',
-        borderRadius: '9px',
-        borderTop:    '1px solid var(--border)',
-        borderRight:  '1px solid var(--border)',
-        borderBottom: '1px solid var(--border)',
+        borderRadius: 'var(--radius-sm)',
+        borderTop:    `1px solid ${hov && !done ? 'var(--accent-border)' : 'var(--border)'}`,
+        borderRight:  `1px solid ${hov && !done ? 'var(--accent-border)' : 'var(--border)'}`,
+        borderBottom: `1px solid ${hov && !done ? 'var(--accent-border)' : 'var(--border)'}`,
         borderLeft:   `3px solid ${done ? 'var(--border)' : prio.color}`,
-        background:   hov ? 'var(--bg2)' : 'var(--bg1)',
-        boxShadow:    hov
-          ? '0 4px 18px rgba(0,0,0,.22), 0 0 0 1px rgba(255,255,255,.03)'
+        background:   hov ? 'linear-gradient(160deg, var(--bg3), var(--bg2))' : 'var(--bg1)',
+        boxShadow:    hov && !done
+          ? '0 6px 22px rgba(0,0,0,.28), 0 0 0 1px rgba(224,189,107,.1)'
           : 'var(--shadow-sm)',
-        transform:    hov ? 'translateY(-1px)' : 'translateY(0)',
+        transform:    hov ? 'translateY(-2px)' : 'translateY(0)',
         opacity:      done ? .48 : 1,
-        transition:   'background .12s, box-shadow .2s, transform .2s, opacity .2s, border-left-color .2s',
+        transition:   'background .15s, box-shadow .2s, transform .2s, opacity .2s, border-color .2s',
       }}
     >
       {/* ── Checkbox circular ── */}
@@ -474,9 +474,11 @@ function TareaForm({ value, setField, onSave, onCancel, saving, mode }) {
 
   return (
     <div style={{
-      background: 'var(--bg2)', border: '1px solid var(--accent-border)',
-      borderRadius: '10px', padding: '16px 16px 14px',
-      marginBottom: '6px', boxShadow: 'var(--shadow-sm)',
+      background: 'linear-gradient(160deg, var(--bg3) 0%, var(--bg2) 100%)',
+      border: '1px solid var(--accent-border)',
+      borderRadius: 'var(--radius)', padding: '16px 16px 14px',
+      marginBottom: '6px',
+      boxShadow: '0 8px 24px -8px rgba(0,0,0,.5), 0 0 0 1px var(--accent-border)',
       animation: 'fadeIn .15s ease',
     }}>
       {/* ── Título ── */}
@@ -568,27 +570,28 @@ function TareaForm({ value, setField, onSave, onCancel, saving, mode }) {
 
         {/* Acciones */}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
-          <button onClick={onCancel} style={{
-            padding: '6px 14px', borderRadius: '7px',
-            border: '1px solid var(--border)', background: 'none',
-            color: 'var(--text1)', fontSize: '12px', fontWeight: 500,
-            fontFamily: 'Inter, sans-serif', cursor: 'pointer', transition: 'border-color .12s',
-          }}
-            onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--border-hi)'}
-            onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+          <button onClick={onCancel}
+            className="btn-secondary"
+            style={{
+              padding: '6px 14px', borderRadius: '7px',
+              border: '1px solid var(--border)', background: 'none',
+              color: 'var(--text1)', fontSize: '12px', fontWeight: 500,
+              fontFamily: 'Inter, sans-serif', cursor: 'pointer', transition: 'all .18s ease',
+            }}
           >
             Cancelar
           </button>
           <button
             onClick={onSave}
             disabled={!canSave}
+            className="btn-primary"
             style={{
               padding: '6px 18px', borderRadius: '7px', border: 'none',
               background: canSave ? 'var(--accent)' : 'var(--bg3)',
-              color:      canSave ? '#fff' : 'var(--text2)',
-              fontSize: '12px', fontWeight: 500, fontFamily: 'Inter, sans-serif',
+              color:      canSave ? '#1a1608' : 'var(--text2)',
+              fontSize: '12px', fontWeight: 600, fontFamily: 'Inter, sans-serif',
               cursor: canSave ? 'pointer' : 'not-allowed',
-              opacity: saving ? .7 : 1, transition: 'all .12s',
+              opacity: saving ? .7 : 1, transition: 'all .2s ease',
             }}
           >
             {saving ? 'Guardando...' : mode === 'edit' ? 'Guardar cambios' : 'Agregar'}

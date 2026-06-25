@@ -326,6 +326,32 @@ input, select, textarea { font-family: inherit; }
   box-shadow: 0 10px 28px -8px rgba(120,90,40,.24), 0 0 0 1px var(--accent-border), 0 0 22px -6px rgba(169,128,47,.15);
 }
 
+/* ── Button variants ── */
+.btn-primary:hover:not(:disabled) {
+  box-shadow: 0 4px 18px rgba(224,189,107,.45), 0 2px 8px rgba(0,0,0,.25);
+  transform: translateY(-1px);
+}
+[data-theme="light"] .btn-primary:hover:not(:disabled) {
+  box-shadow: 0 4px 14px rgba(169,128,47,.4), 0 2px 6px rgba(120,90,40,.18);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--border-hi) !important;
+  color: var(--text0) !important;
+}
+
+/* ── Input / textarea focus ring ── */
+input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent-border) !important;
+  box-shadow: 0 0 0 3px rgba(224,189,107,.07);
+}
+[data-theme="light"] input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):focus,
+[data-theme="light"] textarea:focus {
+  box-shadow: 0 0 0 3px rgba(169,128,47,.07);
+}
+
 /* ── Range inputs ── */
 input[type="range"] {
   -webkit-appearance: none;

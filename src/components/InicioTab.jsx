@@ -252,13 +252,12 @@ function CheckinSummary({ data, onEdit }) {
         </div>
         <button
           onClick={onEdit}
+          className="btn-secondary"
           style={{
             padding: '5px 16px', background: 'none', border: '1px solid var(--border)',
             borderRadius: '6px', color: 'var(--text1)', fontSize: '12px', fontWeight: 500,
-            fontFamily: 'Inter, sans-serif', cursor: 'pointer', transition: 'border-color .12s, color .12s',
+            fontFamily: 'Inter, sans-serif', cursor: 'pointer', transition: 'all .18s ease',
           }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-hi)'; e.currentTarget.style.color = 'var(--text0)' }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text1)' }}
         >
           Editar
         </button>
@@ -316,13 +315,12 @@ function CheckinForm({ fields, onField, onSave, saving, isEdit, onCancel }) {
         {onCancel && (
           <button
             onClick={onCancel}
+            className="btn-secondary"
             style={{
               padding: '9px 20px', background: 'none', border: '1px solid var(--border)',
               borderRadius: '7px', color: 'var(--text1)', fontFamily: 'Inter, sans-serif',
-              fontSize: '13px', cursor: 'pointer', transition: 'border-color .12s',
+              fontSize: '13px', cursor: 'pointer', transition: 'all .18s ease',
             }}
-            onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--border-hi)'}
-            onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
           >
             Cancelar
           </button>
@@ -330,14 +328,15 @@ function CheckinForm({ fields, onField, onSave, saving, isEdit, onCancel }) {
         <button
           onClick={onSave}
           disabled={saving}
+          className="btn-primary"
           style={{
             padding: '9px 24px',
             background: saving ? 'var(--bg3)' : 'var(--accent)',
             border: 'none', borderRadius: '7px',
-            color: saving ? 'var(--text2)' : '#fff',
-            fontFamily: 'Inter, sans-serif', fontSize: '13px', fontWeight: 500,
+            color: saving ? 'var(--text2)' : '#1a1608',
+            fontFamily: 'Inter, sans-serif', fontSize: '13px', fontWeight: 600,
             cursor: saving ? 'not-allowed' : 'pointer',
-            opacity: saving ? .7 : 1, transition: 'opacity .12s',
+            opacity: saving ? .7 : 1, transition: 'all .2s ease',
           }}
         >
           {saving ? 'Guardando...' : isEdit ? 'Actualizar' : 'Guardar check-in'}

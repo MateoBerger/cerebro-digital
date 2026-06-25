@@ -317,8 +317,10 @@ export default function CalendarioTab({ uid, gcalToken, onGcalToken, onGcalExpir
       {/* ── Banner si no hay token ── */}
       {needsConnect && (
         <div style={{
-          margin:'16px 28px', padding:'16px 20px', borderRadius:'10px',
-          background:'var(--bg1)', border:'1px solid var(--border)',
+          margin:'16px 28px', padding:'16px 20px', borderRadius:'var(--radius)',
+          background:'linear-gradient(160deg, var(--bg3) 0%, var(--bg2) 100%)',
+          border:'1px solid var(--accent-border)',
+          boxShadow:'0 6px 20px -8px rgba(0,0,0,.4)',
           display:'flex', alignItems:'center', gap:'14px',
         }}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -337,11 +339,12 @@ export default function CalendarioTab({ uid, gcalToken, onGcalToken, onGcalExpir
           </div>
           <button
             onClick={handleReconnect}
+            className="btn-primary"
             style={{
               padding:'8px 16px', borderRadius:'8px', border:'none',
-              background:'var(--accent)', color:'#fff',
-              fontSize:'13px', fontWeight:500, fontFamily:'Inter, sans-serif',
-              cursor:'pointer', whiteSpace:'nowrap',
+              background:'var(--accent)', color:'#1a1608',
+              fontSize:'13px', fontWeight:600, fontFamily:'Inter, sans-serif',
+              cursor:'pointer', whiteSpace:'nowrap', transition:'all .2s ease',
             }}
           >
             {everConnected ? 'Reconectar' : 'Conectar Google Calendar'}
@@ -579,17 +582,21 @@ function MigracionModal({ uid, gcalToken, onDone }) {
               Los originales quedarán en Firestore como respaldo (marcados como migrados). No se van a borrar.
             </p>
             <div style={{ display:'flex', gap:'8px' }}>
-              <button onClick={handleDescartar} style={{
-                flex:1, padding:'9px', borderRadius:'8px', border:'1px solid var(--border)',
-                background:'none', color:'var(--text1)', fontSize:'13px', fontWeight:500,
-                fontFamily:'Inter, sans-serif', cursor:'pointer',
+              <button onClick={handleDescartar}
+                className="btn-secondary"
+                style={{
+                  flex:1, padding:'9px', borderRadius:'8px', border:'1px solid var(--border)',
+                  background:'none', color:'var(--text1)', fontSize:'13px', fontWeight:500,
+                  fontFamily:'Inter, sans-serif', cursor:'pointer', transition:'all .18s ease',
               }}>
                 No, ignorar
               </button>
-              <button onClick={handleImportar} style={{
-                flex:2, padding:'9px', borderRadius:'8px', border:'none',
-                background:'var(--accent)', color:'#fff', fontSize:'13px', fontWeight:600,
-                fontFamily:'Inter, sans-serif', cursor:'pointer',
+              <button onClick={handleImportar}
+                className="btn-primary"
+                style={{
+                  flex:2, padding:'9px', borderRadius:'8px', border:'none',
+                  background:'var(--accent)', color:'#1a1608', fontSize:'13px', fontWeight:600,
+                  fontFamily:'Inter, sans-serif', cursor:'pointer', transition:'all .2s ease',
               }}>
                 Importar {bloques.length} evento{bloques.length !== 1 ? 's' : ''}
               </button>
@@ -624,10 +631,12 @@ function MigracionModal({ uid, gcalToken, onDone }) {
                 {resultado.failed} evento{resultado.failed !== 1 ? 's' : ''} no se pudieron importar.
               </p>
             )}
-            <button onClick={onDone} style={{
-              width:'100%', padding:'9px', borderRadius:'8px', border:'none',
-              background:'var(--accent)', color:'#fff', fontSize:'13px', fontWeight:600,
-              fontFamily:'Inter, sans-serif', cursor:'pointer',
+            <button onClick={onDone}
+              className="btn-primary"
+              style={{
+                width:'100%', padding:'9px', borderRadius:'8px', border:'none',
+                background:'var(--accent)', color:'#1a1608', fontSize:'13px', fontWeight:600,
+                fontFamily:'Inter, sans-serif', cursor:'pointer', transition:'all .2s ease',
             }}>
               Cerrar
             </button>
@@ -730,8 +739,8 @@ function BloqueCard({ bloque, onEdit }) {
         padding: compact ? '2px 5px' : '5px 7px',
         overflow:'hidden',
         cursor:'pointer', zIndex:2,
-        boxShadow: hov ? '0 3px 10px rgba(0,0,0,.3)' : '0 1px 4px rgba(0,0,0,.18)',
-        transform: hov ? 'scaleX(.98)' : 'scaleX(1)',
+        boxShadow: hov ? `0 4px 14px rgba(0,0,0,.4), 0 0 0 1px ${t.border}` : '0 1px 4px rgba(0,0,0,.18)',
+        transform: hov ? 'scaleX(.98) translateY(-1px)' : 'scaleX(1) translateY(0)',
         transition:'box-shadow .12s, transform .12s',
         userSelect:'none',
       }}
@@ -777,8 +786,9 @@ function BloquePanel({ form, setField, onSave, onCancel, onDelete, saving }) {
   return (
     <div style={{
       position:'fixed', top:0, right:0, bottom:0, width:'300px',
-      background:'var(--bg1)', borderLeft:'1px solid var(--border)',
-      boxShadow:'-10px 0 40px rgba(0,0,0,.28)',
+      background:'linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 100%)',
+      borderLeft:'1px solid var(--border)',
+      boxShadow:'-12px 0 40px rgba(0,0,0,.35), inset 1px 0 0 rgba(255,255,255,.03)',
       zIndex:50, display:'flex', flexDirection:'column',
       transform: form ? 'translateX(0)' : 'translateX(100%)',
       transition:'transform .22s ease',
@@ -968,21 +978,22 @@ function PanelContent({ form, setField, onSave, onCancel, onDelete, saving }) {
           </button>
         )}
         <div style={{ display:'flex', gap:'8px' }}>
-          <button onClick={onCancel} style={{
-            flex:1, padding:'9px', borderRadius:'7px', border:'1px solid var(--border)',
-            background:'none', color:'var(--text1)', fontSize:'13px', fontWeight:500,
-            fontFamily:'Inter, sans-serif', cursor:'pointer', transition:'border-color .12s',
-          }}
-            onMouseEnter={e => e.currentTarget.style.borderColor='var(--border-hi)'}
-            onMouseLeave={e => e.currentTarget.style.borderColor='var(--border)'}
-          >Cancelar</button>
-          <button onClick={onSave} disabled={!canSave} style={{
-            flex:2, padding:'9px', borderRadius:'7px', border:'none',
-            background: canSave ? 'var(--accent)' : 'var(--bg3)',
-            color: canSave ? '#fff' : 'var(--text2)',
-            fontSize:'13px', fontWeight:600, fontFamily:'Inter, sans-serif',
-            cursor: canSave ? 'pointer' : 'not-allowed',
-            opacity: saving ? .7 : 1, transition:'all .12s',
+          <button onClick={onCancel}
+            className="btn-secondary"
+            style={{
+              flex:1, padding:'9px', borderRadius:'7px', border:'1px solid var(--border)',
+              background:'none', color:'var(--text1)', fontSize:'13px', fontWeight:500,
+              fontFamily:'Inter, sans-serif', cursor:'pointer', transition:'all .18s ease',
+          }}>Cancelar</button>
+          <button onClick={onSave} disabled={!canSave}
+            className="btn-primary"
+            style={{
+              flex:2, padding:'9px', borderRadius:'7px', border:'none',
+              background: canSave ? 'var(--accent)' : 'var(--bg3)',
+              color: canSave ? '#1a1608' : 'var(--text2)',
+              fontSize:'13px', fontWeight:600, fontFamily:'Inter, sans-serif',
+              cursor: canSave ? 'pointer' : 'not-allowed',
+              opacity: saving ? .7 : 1, transition:'all .2s ease',
           }}>
             {saving ? 'Guardando...' : isEdit ? 'Guardar cambios' : 'Agregar evento'}
           </button>
