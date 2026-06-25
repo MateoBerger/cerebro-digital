@@ -365,7 +365,7 @@ export default function CalendarioTab({ uid, gcalToken, onGcalToken, onGcalExpir
                 <div key={di} style={{
                   flex:1, padding:'8px 0 10px', textAlign:'center',
                   borderRight: di < 6 ? '1px solid var(--border)' : 'none',
-                  background: isHoy ? 'rgba(124,110,245,.05)' : 'none',
+                  background: isHoy ? 'rgba(224,189,107,.05)' : 'none',
                 }}>
                   <div style={{ fontSize:'10px', fontWeight:600, color: isHoy ? 'var(--accent)' : 'var(--text2)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom:'4px' }}>
                     {DIAS_CORTO[di]}
@@ -416,7 +416,7 @@ export default function CalendarioTab({ uid, gcalToken, onGcalToken, onGcalExpir
                   <div key={di} onClick={e => handleDayClick(e, di)} style={{
                     flex:1, position:'relative',
                     borderRight: di < 6 ? '1px solid var(--border)' : 'none',
-                    background: isHoy ? 'rgba(124,110,245,.022)' : 'none',
+                    background: isHoy ? 'rgba(224,189,107,.022)' : 'none',
                     cursor:'cell', userSelect:'none', zIndex:1,
                   }}>
                     {isHoy && weekOffset === 0 && (

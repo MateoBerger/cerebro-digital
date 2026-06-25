@@ -228,7 +228,7 @@ export const GUIDES_DATA = [
     id: 'mat-m2-funciones',
     label: 'Funciones y Análisis',
     subject: 'm2',
-    color: '#7c6ef5',
+    color: '#e0bd6b',
     theory: `Temas de M2: funciones, límites, derivadas e integrales.
 
 **Funciones:**

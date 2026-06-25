@@ -17,16 +17,16 @@ export default function FloatingChat({ uid }) {
           width: '52px', height: '52px', borderRadius: '50%',
           background: 'var(--accent)', border: 'none', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 4px 20px rgba(124,110,245,.45)',
+          boxShadow: '0 4px 20px rgba(224,189,107,.45)',
           transition: 'transform .15s, box-shadow .15s',
         }}
         onMouseEnter={e => {
           e.currentTarget.style.transform  = 'scale(1.07)'
-          e.currentTarget.style.boxShadow  = '0 6px 28px rgba(124,110,245,.6)'
+          e.currentTarget.style.boxShadow  = '0 6px 28px rgba(224,189,107,.6)'
         }}
         onMouseLeave={e => {
           e.currentTarget.style.transform  = 'scale(1)'
-          e.currentTarget.style.boxShadow  = '0 4px 20px rgba(124,110,245,.45)'
+          e.currentTarget.style.boxShadow  = '0 4px 20px rgba(224,189,107,.45)'
         }}
       >
         {open ? (
