@@ -116,7 +116,7 @@ export default function InicioTab({ uid, gcalToken, onGcalExpired }) {
           src="/cerebro-logo.png"
           alt=""
           aria-hidden="true"
-          style={{ width: '520px', height: '520px', objectFit: 'contain', marginRight: '60px' }}
+          style={{ width: '420px', height: '420px', objectFit: 'contain', marginRight: '80px' }}
         />
       </div>
       <div style={{ position: 'relative', zIndex: 1, padding: '32px 36px' }}>

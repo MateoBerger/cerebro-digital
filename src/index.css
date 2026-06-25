@@ -41,10 +41,10 @@
 
 /* ── Tokens: light ── */
 [data-theme="light"] {
-  --bg0:       #e3d8c3;
-  --bg1:       #e9dfcd;
-  --bg2:       #f1e9d9;
-  --bg3:       #f5eee0;
+  --bg0:       #d8ccb3;
+  --bg1:       #e0d5bf;
+  --bg2:       #e9dfcd;
+  --bg3:       #efe7d6;
   --border:    #d3c4a8;
   --border-hi: #c9b896;
 
@@ -53,7 +53,7 @@
   --text2: #9c8868;
 
   --accent:        #a9802f;
-  --accent-dim:    rgba(169,128,47,.14);
+  --accent-dim:    rgba(169,128,47,.22);
   --accent-border: rgba(169,128,47,.4);
 
   --green: #5f9466;
