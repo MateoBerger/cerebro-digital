@@ -363,6 +363,10 @@ input[type="range"]::-moz-range-track {
   background: var(--bg3);
 }
 
+/* ── Inicio watermark ── */
+.inicio-watermark       { opacity: .07; }
+[data-theme="light"] .inicio-watermark { opacity: .13; }
+
 /* ── Placeholder pages ── */
 .placeholder-page {
   flex: 1;

@@ -101,17 +101,24 @@ export default function InicioTab({ uid, gcalToken, onGcalExpired }) {
   const showForm = saved === null || editing
 
   return (
-    <div style={{
-      flex: 1, overflowY: 'auto', position: 'relative',
-      backgroundImage: 'url(/fondo-inicio.png)',
-      backgroundSize: 'cover', backgroundPosition: 'center top',
-    }}>
-      {/* Overlay adaptado al tema */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        background: 'var(--inicio-overlay)',
-        pointerEvents: 'none', zIndex: 0,
-      }} />
+    <div style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
+      {/* Marca de agua: logo de fondo */}
+      <div
+        className="inicio-watermark"
+        style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+          pointerEvents: 'none', zIndex: 0,
+          overflow: 'hidden',
+        }}
+      >
+        <img
+          src="/cerebro-logo.png"
+          alt=""
+          aria-hidden="true"
+          style={{ width: '520px', height: '520px', objectFit: 'contain', marginRight: '60px' }}
+        />
+      </div>
       <div style={{ position: 'relative', zIndex: 1, padding: '32px 36px' }}>
       <div style={{ maxWidth: '680px' }}>
 
