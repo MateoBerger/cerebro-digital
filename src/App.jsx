@@ -67,14 +67,16 @@ export default function App() {
         onThemeToggle={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
       />
       <div className="app-content">
-        {tab === 'inicio'     && <InicioTab    uid={user.uid} gcalToken={gcalToken} onGcalExpired={onGcalExpired} />}
-        {tab === 'dashboard'  && <DashboardTab uid={user.uid} onInfo={setInfo} />}
-        {tab === 'diagram'    && <DiagramTab   uid={user.uid} onInfo={setInfo} />}
-        {tab === 'dict'       && <DictTab      uid={user.uid} onInfo={setInfo} />}
-        {tab === 'tareas'     && <TareasTab uid={user.uid} />}
-        {tab === 'calendario' && <CalendarioTab uid={user.uid} gcalToken={gcalToken} onGcalToken={saveGcalToken} onGcalExpired={onGcalExpired} />}
-        {tab === 'paes'       && <PAESTab uid={user.uid} />}
-        {tab === 'asistente'  && <AsistenteTab uid={user.uid} />}
+        <div key={tab} className="tab-enter">
+          {tab === 'inicio'     && <InicioTab    uid={user.uid} gcalToken={gcalToken} onGcalExpired={onGcalExpired} />}
+          {tab === 'dashboard'  && <DashboardTab uid={user.uid} onInfo={setInfo} />}
+          {tab === 'diagram'    && <DiagramTab   uid={user.uid} onInfo={setInfo} />}
+          {tab === 'dict'       && <DictTab      uid={user.uid} onInfo={setInfo} />}
+          {tab === 'tareas'     && <TareasTab uid={user.uid} />}
+          {tab === 'calendario' && <CalendarioTab uid={user.uid} gcalToken={gcalToken} onGcalToken={saveGcalToken} onGcalExpired={onGcalExpired} />}
+          {tab === 'paes'       && <PAESTab uid={user.uid} />}
+          {tab === 'asistente'  && <AsistenteTab uid={user.uid} />}
+        </div>
       </div>
       {tab !== 'asistente' && <FloatingChat uid={user.uid} />}
       <NotifPrompt uid={user.uid} />

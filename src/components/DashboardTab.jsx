@@ -141,7 +141,7 @@ export default function DashboardTab({ uid }) {
       <PaesCountdown days={daysUntilPAES()} />
 
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+      <div className="stagger-children" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px', marginBottom: '24px' }}>
         <StatCard label="Modo"      value={String(modo)}     color={MODO_COLOR[modo] || 'var(--violet)'} />
         <StatCard label="Racha"     value={`${racha} días`}  color="var(--amber)" suffix="🔥" />
         <StatCard label="Meta PAES" value={String(metaPaes)} color="var(--blue)" />
@@ -154,7 +154,7 @@ export default function DashboardTab({ uid }) {
       {weekend && <WeekSummaryCard tareas={tareas} checkins={weekCheckins} />}
 
       {/* Cards principales */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+      <div className="stagger-children" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
         <MetasDiariasCard items={goalItems} state={goalState} uid={uid} />
         <TareasAltaCard   tareas={tareasAltaPrio} uid={uid} />
         <MetasCard        tareas={tareasSemana}   uid={uid} />

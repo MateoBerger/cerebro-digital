@@ -310,7 +310,14 @@ function SectionBtn({ active, onClick }) {
 // ── Tarjeta de tarea ───────────────────────────────────────────────────────────
 
 function TareaItem({ tarea, onToggle, onEdit, onDelete }) {
-  const [hov, setHov] = useState(false)
+  const [hov, setHov]         = useState(false)
+  const [removing, setRemoving] = useState(false)
+
+  function handleDelete() {
+    setRemoving(true)
+    setTimeout(onDelete, 180)
+  }
+
   const cat   = CAT_META[tarea.categoria]  || CAT_META.academico
   const prio  = PRIO_META[tarea.prioridad] || PRIO_META.media
   const fecha = formatFecha(tarea.fecha)
@@ -318,6 +325,7 @@ function TareaItem({ tarea, onToggle, onEdit, onDelete }) {
 
   return (
     <div
+      className={`task-item${removing ? ' task-item--exit' : ''}`}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
@@ -352,7 +360,7 @@ function TareaItem({ tarea, onToggle, onEdit, onDelete }) {
           }}
         >
           {done && (
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#3ec97e" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg key="done" className="check-pop" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#3ec97e" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20 6L9 17l-5-5" />
             </svg>
           )}
@@ -429,7 +437,7 @@ function TareaItem({ tarea, onToggle, onEdit, onDelete }) {
               </svg>
             </IconBtn>
             {/* Eliminar */}
-            <IconBtn onClick={onDelete} title="Eliminar"
+            <IconBtn onClick={handleDelete} title="Eliminar"
               hoverColor="#f07272" hoverBg="rgba(240,114,114,.1)">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="3 6 5 6 21 6" />
@@ -479,7 +487,7 @@ function TareaForm({ value, setField, onSave, onCancel, saving, mode }) {
       borderRadius: 'var(--radius)', padding: '16px 16px 14px',
       marginBottom: '6px',
       boxShadow: '0 8px 24px -8px rgba(0,0,0,.5), 0 0 0 1px var(--accent-border)',
-      animation: 'fadeIn .15s ease',
+      animation: 'slideUp .2s cubic-bezier(.25,.46,.45,.94) both',
     }}>
       {/* ── Título ── */}
       <input

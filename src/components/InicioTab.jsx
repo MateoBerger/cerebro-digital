@@ -137,6 +137,7 @@ export default function InicioTab({ uid, gcalToken, onGcalExpired }) {
         {/* Calendario del día */}
         {eventosHoy !== null && <CalendarioDia eventos={eventosHoy} />}
 
+        <div className="stagger-children">
         {/* Descripción estática */}
         <div className="card" style={{ marginBottom: '20px' }}>
           <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text0)', marginBottom: '12px' }}>¿Qué es SMGV?</h2>
@@ -185,6 +186,7 @@ export default function InicioTab({ uid, gcalToken, onGcalExpired }) {
             />
           )}
         </div>
+        </div>{/* /stagger-children */}
 
       </div>
       </div>

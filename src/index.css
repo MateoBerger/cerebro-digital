@@ -747,3 +747,64 @@ input[type="range"]::-moz-range-track {
   animation:l-slide 1.3s ease-in-out infinite;
 }
 @keyframes l-slide { 0%{left:-40%} 100%{left:100%} }
+
+/* ── Micro-animations ── */
+
+/* 1 · Tab switch: whole content area fades + slides up */
+.tab-enter {
+  flex: 1; overflow: hidden; display: flex; flex-direction: column;
+  animation: tab-enter 260ms cubic-bezier(.25,.46,.45,.94) both;
+}
+@keyframes tab-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 2 · Staggered cards: direct children of .stagger-children animate in */
+.stagger-children > * {
+  animation: card-enter 280ms cubic-bezier(.25,.46,.45,.94) both;
+}
+.stagger-children > *:nth-child(1) { animation-delay:   0ms; }
+.stagger-children > *:nth-child(2) { animation-delay:  55ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 110ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 165ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 218ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 268ms; }
+.stagger-children > *:nth-child(n+7) { animation-delay: 310ms; }
+@keyframes card-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 3 · Task item entrance (plays on mount — new items & tab load) */
+.task-item { animation: task-enter 220ms cubic-bezier(.25,.46,.45,.94) both; }
+@keyframes task-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Task exit: slides left + fades — plays before Firestore removes the node */
+.task-item--exit {
+  animation: task-exit 180ms cubic-bezier(.4,0,1,1) forwards;
+  pointer-events: none;
+}
+@keyframes task-exit {
+  to { opacity: 0; transform: translateX(-8px); }
+}
+
+/* Checkmark pop — plays when the SVG mounts (task toggled to done) */
+.check-pop { animation: check-pop 220ms cubic-bezier(.2,.8,.4,1.5) both; }
+@keyframes check-pop {
+  from { transform: scale(0); opacity: 0; }
+  65%  { transform: scale(1.3); opacity: 1; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+/* Accessibility: honour system preference */
+@media (prefers-reduced-motion: reduce) {
+  .tab-enter,
+  .stagger-children > *,
+  .task-item,
+  .task-item--exit,
+  .check-pop { animation: none !important; transition-duration: .01ms !important; }
+}
