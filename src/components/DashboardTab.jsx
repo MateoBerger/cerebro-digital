@@ -96,13 +96,17 @@ export default function DashboardTab({ uid, user }) {
 
   const weekend = isWeekend()
 
-  // Progreso del día (mismo cálculo que MetasDiariasCard, para detectar cruce a 100%)
-  const dow          = chileDate().getDay()
-  const visibleGoals = goalItems
+  // Progreso del día: hábitos diarios + tareas de alcance 'diaria' (excluye semanal/general)
+  const dow           = chileDate().getDay()
+  const visibleGoals  = goalItems
     .map(item => item.id === 'item_preu' ? { ...item, label: 'Asistí al preu' } : item)
     .filter(item => item.id !== 'item_preu' || PREU_DAYS.has(dow))
-  const checkedGoals = visibleGoals.filter(i => goalState[i.id]).length
-  const dayPct       = visibleGoals.length > 0 ? Math.round(checkedGoals / visibleGoals.length * 100) : 0
+  const checkedGoals  = visibleGoals.filter(i => goalState[i.id]).length
+  const tareasDiarias = tareas.filter(t => (t.alcance || 'general') === 'diaria')
+  const tareasHechas  = tareasDiarias.filter(t => t.completada).length
+  const dayTotal      = visibleGoals.length + tareasDiarias.length
+  const dayDone       = checkedGoals + tareasHechas
+  const dayPct        = dayTotal > 0 ? Math.round(dayDone / dayTotal * 100) : 0
 
   useEffect(() => { dayCompleteStreakRef.current = dayCompleteStreak }, [dayCompleteStreak])
 
@@ -130,7 +134,7 @@ export default function DashboardTab({ uid, user }) {
 
   // Detecta el cruce de <100% → 100%; nunca dispara en la carga inicial
   useEffect(() => {
-    if (!goalStateLoadedRef.current || visibleGoals.length === 0) return
+    if (!goalStateLoadedRef.current || dayTotal === 0) return
     if (prevPctRef.current !== null && prevPctRef.current < 100 && dayPct === 100) {
       setShowConfetti(true)
       celebrationSound()
@@ -664,8 +668,8 @@ function DayCompleteConfetti({ displayName, streak, onDone }) {
   const [pieces]              = useState(() => generateConfetti(90))
 
   useEffect(() => {
-    const t1 = setTimeout(() => setVisible(false), 4500)
-    const t2 = setTimeout(() => { setGone(true); onDone?.() }, 5600)
+    const t1 = setTimeout(() => setVisible(false), 3500)
+    const t2 = setTimeout(() => { setGone(true); onDone?.() }, 4600)
     return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [onDone])
 
