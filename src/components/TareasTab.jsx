@@ -33,7 +33,7 @@ const PAES_SUBJECTS = [
 
 const EMPTY_FIELDS = {
   titulo: '', descripcion: '', categoria: 'academico', prioridad: 'media',
-  fecha: '', note: '', paesSubject: '',
+  fecha: '', paesSubject: '',
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -52,17 +52,6 @@ function formatFecha(fechaStr) {
   if (fechaStr === tom)   return { label: 'Mañana', overdue: false }
   const label = new Date(fechaStr + 'T12:00:00').toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })
   return { label, overdue: fechaStr < today }
-}
-
-function renderNote(text) {
-  if (!text) return null
-  const parts = text.split(/(https?:\/\/[^\s]+)/g)
-  return parts.map((part, i) =>
-    /^https?:\/\//.test(part)
-      ? <a key={i} href={part} target="_blank" rel="noopener noreferrer"
-           style={{ color: 'var(--accent)', textDecoration: 'underline' }}>{part}</a>
-      : part
-  )
 }
 
 // ── Componente principal ───────────────────────────────────────────────────────
@@ -95,7 +84,6 @@ export default function TareasTab({ uid }) {
       categoria:   t.categoria || 'academico',
       prioridad:   t.prioridad || 'media',
       fecha:       t.fecha || '',
-      note:        t.note || '',
       paesSubject: t.paesSubject || '',
     })
   }
@@ -114,7 +102,6 @@ export default function TareasTab({ uid }) {
       prioridad:   form.prioridad,
       alcance:     form.alcance,
       fecha:       form.fecha,
-      note:        (form.note || '').trim(),
       paesSubject: form.paesSubject || '',
     }
     if (form.mode === 'new') {
@@ -377,7 +364,6 @@ function TareaItem({ uid, tarea, onToggle, onEdit, onDelete }) {
   const [hov, setHov]             = useState(false)
   const [removing, setRemoving]   = useState(false)
   const [showSubs, setShowSubs]   = useState(false)
-  const [showFullNote, setShowFullNote] = useState(false)
 
   function handleDelete() {
     setRemoving(true)
@@ -446,7 +432,7 @@ function TareaItem({ uid, tarea, onToggle, onEdit, onDelete }) {
           color:          done ? 'var(--text2)' : 'var(--text0)',
           fontWeight:     tarea.prioridad === 'alta' && !done ? 600 : 400,
           textDecoration: done ? 'line-through' : 'none',
-          marginBottom:   (tarea.descripcion || tarea.note || hasSubs) ? '5px' : '8px',
+          marginBottom:   (tarea.descripcion || hasSubs) ? '5px' : '8px',
         }}>
           {tarea.titulo}
         </span>
@@ -455,7 +441,7 @@ function TareaItem({ uid, tarea, onToggle, onEdit, onDelete }) {
         {tarea.descripcion && (
           <p style={{
             fontSize: '12px', color: 'var(--text2)', lineHeight: 1.55,
-            marginBottom: (tarea.note || hasSubs) ? '6px' : '9px',
+            marginBottom: hasSubs ? '6px' : '9px',
             display: '-webkit-box', WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical', overflow: 'hidden',
           }}>
@@ -463,31 +449,8 @@ function TareaItem({ uid, tarea, onToggle, onEdit, onDelete }) {
           </p>
         )}
 
-        {/* Nota */}
-        {tarea.note && (
-          <div style={{
-            borderLeft: '2px solid var(--accent)',
-            paddingLeft: '8px',
-            marginBottom: hasSubs ? '6px' : '9px',
-          }}>
-            <p
-              onClick={() => setShowFullNote(v => !v)}
-              style={{
-                fontSize: '11.5px', fontStyle: 'italic', color: 'var(--text2)',
-                lineHeight: 1.55, cursor: 'pointer', margin: 0,
-                display: showFullNote ? 'block' : '-webkit-box',
-                WebkitLineClamp: showFullNote ? undefined : 2,
-                WebkitBoxOrient: 'vertical',
-                overflow: showFullNote ? 'visible' : 'hidden',
-              }}
-            >
-              {renderNote(tarea.note)}
-            </p>
-          </div>
-        )}
-
-        {/* Progreso de subtareas (mini barra clickable) */}
-        {hasSubs && (
+        {/* Subtareas: barra de progreso si hay, o botón "+ Subtarea" si no hay */}
+        {hasSubs ? (
           <button
             onClick={() => setShowSubs(v => !v)}
             style={{
@@ -516,6 +479,22 @@ function TareaItem({ uid, tarea, onToggle, onEdit, onDelete }) {
               <path d="M6 9l6 6 6-6" />
             </svg>
           </button>
+        ) : (
+          <button
+            onClick={() => setShowSubs(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '4px',
+              background: 'none', border: 'none', cursor: 'pointer',
+              padding: '0', marginBottom: '8px',
+              color: 'var(--text2)', fontSize: '11px', fontFamily: 'Inter, sans-serif',
+              opacity: hov ? 1 : 0, transition: 'opacity .15s',
+            }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Subtarea
+          </button>
         )}
 
         {/* Panel de subtareas expandido */}
@@ -541,11 +520,6 @@ function TareaItem({ uid, tarea, onToggle, onEdit, onDelete }) {
             }}>
               {paes.label}
             </span>
-          )}
-
-          {/* Indicador de nota */}
-          {tarea.note && (
-            <span style={{ fontSize: '11px', flexShrink: 0, lineHeight: 1 }} title="Tiene nota">📝</span>
           )}
 
           {/* Prioridad (alta siempre; media en hover; baja nunca) */}
@@ -843,20 +817,6 @@ function TareaForm({ value, setField, onSave, onCancel, saving, mode }) {
           width: '100%', background: 'none', resize: 'none',
           border: 'none', borderTop: '1px solid var(--border)', outline: 'none',
           color: 'var(--text1)', fontSize: '12px', lineHeight: 1.6,
-          fontFamily: 'Inter, sans-serif', padding: '10px 0 10px',
-        }}
-      />
-
-      {/* ── Nota ── */}
-      <textarea
-        placeholder="Nota o enlace (opcional)..."
-        value={value.note}
-        onChange={e => setField('note', e.target.value)}
-        rows={2}
-        style={{
-          width: '100%', background: 'none', resize: 'none',
-          border: 'none', borderTop: '1px solid var(--border)', outline: 'none',
-          color: 'var(--text2)', fontSize: '12px', lineHeight: 1.6, fontStyle: 'italic',
           fontFamily: 'Inter, sans-serif', padding: '10px 0 12px',
         }}
       />
