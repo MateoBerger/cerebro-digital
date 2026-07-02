@@ -269,8 +269,14 @@ export async function deletePaesError(uid, id) {
 // ── GYM STREAK ────────────────────────────────────────────
 // users/{uid}/gym-data/stats
 
-function gymLocalDate() {
-  const d = new Date()
+function gymChileDate() {
+  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+
+function gymChileYesterday() {
+  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))
+  d.setDate(d.getDate() - 1)
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
@@ -281,13 +287,10 @@ export function subscribeGymStats(uid, callback) {
 }
 
 export async function markGymSession(uid, currentStats) {
-  const today = gymLocalDate()
+  const today = gymChileDate()
   if (currentStats?.lastGymDate === today) return
 
-  const d = new Date()
-  d.setDate(d.getDate() - 1)
-  const yesterday = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-
+  const yesterday  = gymChileYesterday()
   const prevStreak = currentStats?.streak || 0
   const newStreak  = currentStats?.lastGymDate === yesterday ? prevStreak + 1 : 1
 
@@ -296,6 +299,32 @@ export async function markGymSession(uid, currentStats) {
     lastGymDate:   today,
     totalSessions: (currentStats?.totalSessions || 0) + 1,
   }, { merge: true })
+}
+
+// ── DAY-COMPLETE STREAK ───────────────────────────────────
+// users/{uid}/settings/day-complete-streak
+
+export function subscribeDayCompleteStreak(uid, callback) {
+  return onSnapshot(doc(db, 'users', uid, 'settings', 'day-complete-streak'), snap => {
+    callback(snap.exists() ? snap.data() : { streak: 0, lastCompleteDate: null })
+  })
+}
+
+export async function recordDayComplete(uid, currentData) {
+  const today = gymChileDate()
+  const last  = currentData?.lastCompleteDate
+  if (last === today) return currentData?.streak || 1
+
+  const yesterday = gymChileYesterday()
+  const newStreak = last === yesterday ? (currentData?.streak || 0) + 1 : 1
+
+  await setDoc(doc(db, 'users', uid, 'settings', 'day-complete-streak'), {
+    streak:           newStreak,
+    lastCompleteDate: today,
+    updatedAt:        serverTimestamp(),
+  }, { merge: true })
+
+  return newStreak
 }
 
 // ── PAES v2 — EJERCICIOS (generados por IA) ───────────────

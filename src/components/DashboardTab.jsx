@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   subscribeVariables, seedVariables, subscribeTareas, updateTarea,
   subscribeDailyGoalsConfig, subscribeDailyGoalsState, toggleDailyGoal,
-  getCheckinsWeek,
+  getCheckinsWeek, subscribeGymStats, markGymSession,
+  subscribeDayCompleteStreak, recordDayComplete,
 } from '../firebase/db'
 
 // ── Constantes editables ──────────────────────────────────────
@@ -77,15 +78,33 @@ const PRIO_COLOR = { alta: '#f07272', media: '#f0a740', baja: '#625e7c' }
 const TODAY = chileToday()
 
 // ── Componente principal ──────────────────────────────────────
-export default function DashboardTab({ uid }) {
-  const [vars,         setVars]        = useState([])
-  const [tareas,       setTareas]      = useState([])
-  const [goalItems,    setGoalItems]   = useState([])
-  const [goalState,    setGoalState]   = useState({})
-  const [loading,      setLoad]        = useState(true)
-  const [weekCheckins, setWeekCheckins]= useState(null)
+export default function DashboardTab({ uid, user }) {
+  const [vars,              setVars]             = useState([])
+  const [tareas,            setTareas]           = useState([])
+  const [goalItems,         setGoalItems]        = useState([])
+  const [goalState,         setGoalState]        = useState({})
+  const [loading,           setLoad]             = useState(true)
+  const [weekCheckins,      setWeekCheckins]     = useState(null)
+  const [gymStats,          setGymStats]         = useState({ streak: 0, lastGymDate: null, totalSessions: 0 })
+  const [dayCompleteStreak, setDayCompleteStreak]= useState({ streak: 0, lastCompleteDate: null })
+  const [showConfetti,      setShowConfetti]     = useState(false)
+  const [celebrationStreak, setCelebrationStreak]= useState(0)
+
+  const goalStateLoadedRef  = useRef(false)
+  const prevPctRef          = useRef(null)
+  const dayCompleteStreakRef = useRef({ streak: 0, lastCompleteDate: null })
 
   const weekend = isWeekend()
+
+  // Progreso del día (mismo cálculo que MetasDiariasCard, para detectar cruce a 100%)
+  const dow          = chileDate().getDay()
+  const visibleGoals = goalItems
+    .map(item => item.id === 'item_preu' ? { ...item, label: 'Asistí al preu' } : item)
+    .filter(item => item.id !== 'item_preu' || PREU_DAYS.has(dow))
+  const checkedGoals = visibleGoals.filter(i => goalState[i.id]).length
+  const dayPct       = visibleGoals.length > 0 ? Math.round(checkedGoals / visibleGoals.length * 100) : 0
+
+  useEffect(() => { dayCompleteStreakRef.current = dayCompleteStreak }, [dayCompleteStreak])
 
   useEffect(() => {
     if (!uid) return
@@ -94,7 +113,12 @@ export default function DashboardTab({ uid }) {
       subscribeVariables(uid, data => { setVars(data); setLoad(false) }),
       subscribeTareas(uid, setTareas),
       subscribeDailyGoalsConfig(uid, setGoalItems),
-      subscribeDailyGoalsState(uid, TODAY, setGoalState),
+      subscribeDailyGoalsState(uid, TODAY, data => {
+        setGoalState(data)
+        goalStateLoadedRef.current = true
+      }),
+      subscribeGymStats(uid, setGymStats),
+      subscribeDayCompleteStreak(uid, setDayCompleteStreak),
     ]
     return () => unsubs.forEach(u => u())
   }, [uid])
@@ -103,6 +127,17 @@ export default function DashboardTab({ uid }) {
     if (!uid || !weekend) return
     getCheckinsWeek(uid, getWeekDates()).then(setWeekCheckins)
   }, [uid, weekend])
+
+  // Detecta el cruce de <100% → 100%; nunca dispara en la carga inicial
+  useEffect(() => {
+    if (!goalStateLoadedRef.current || visibleGoals.length === 0) return
+    if (prevPctRef.current !== null && prevPctRef.current < 100 && dayPct === 100) {
+      setShowConfetti(true)
+      celebrationSound()
+      recordDayComplete(uid, dayCompleteStreakRef.current).then(setCelebrationStreak)
+    }
+    prevPctRef.current = dayPct
+  }, [dayPct]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const modo     = getVar(vars, 'modo_organizacion', 'estandar')
   const racha    = getVar(vars, 'constancia_preu_racha', 0)
@@ -129,6 +164,14 @@ export default function DashboardTab({ uid }) {
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '32px 36px' }}>
+      {showConfetti && (
+        <DayCompleteConfetti
+          displayName={user?.displayName?.split(' ')[0] || 'Mateo'}
+          streak={celebrationStreak}
+          onDone={() => setShowConfetti(false)}
+        />
+      )}
+
       {/* Saludo */}
       <div style={{ marginBottom: '20px' }}>
         <h1 style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text0)', letterSpacing: '-.5px', marginBottom: '4px' }}>
@@ -142,9 +185,11 @@ export default function DashboardTab({ uid }) {
 
       {/* Stats */}
       <div className="stagger-children" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px', marginBottom: '24px' }}>
-        <StatCard label="Modo"      value={String(modo)}     color={MODO_COLOR[modo] || 'var(--violet)'} />
-        <StatCard label="Racha"     value={`${racha} días`}  color="var(--amber)" suffix="🔥" />
-        <StatCard label="Meta PAES" value={String(metaPaes)} color="var(--blue)" />
+        <StatCard label="Modo"       value={String(modo)}                      color={MODO_COLOR[modo] || 'var(--violet)'} />
+        <StatCard label="Racha"      value={`${racha} días`}                   color="var(--amber)"  suffix="🔥" />
+        <StatCard label="Gym"        value={`${gymStats.streak} días`}         color="var(--green)"  suffix="🏋️" />
+        <StatCard label="Días 100%"  value={`${dayCompleteStreak.streak}`}     color="#e0bd6b"       suffix="✨" />
+        <StatCard label="Meta PAES"  value={String(metaPaes)}                  color="var(--blue)" />
       </div>
 
       {/* Frase del día */}
@@ -155,7 +200,7 @@ export default function DashboardTab({ uid }) {
 
       {/* Cards principales */}
       <div className="stagger-children" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
-        <MetasDiariasCard items={goalItems} state={goalState} uid={uid} />
+        <MetasDiariasCard items={goalItems} state={goalState} uid={uid} gymStats={gymStats} />
         <TareasAltaCard   tareas={tareasAltaPrio} uid={uid} />
         <MetasCard        tareas={tareasSemana}   uid={uid} />
         <PomodoroCard     bloque={bloque} descanso={descanso} micro={micro} meta={metaBloq} />
@@ -369,7 +414,7 @@ function EmptyState({ text, hint }) {
 const PREU_DAYS = new Set([0, 1, 2, 4])
 
 // ── MetasDiariasCard (hábitos marcables) ──────────────────────
-function MetasDiariasCard({ items, state, uid }) {
+function MetasDiariasCard({ items, state, uid, gymStats }) {
   const dow = chileDate().getDay()
 
   // Filtrar preu los días que no hay clase; renombrar label
@@ -381,7 +426,11 @@ function MetasDiariasCard({ items, state, uid }) {
   const allDone = visibleItems.length > 0 && checked === visibleItems.length
 
   async function handleToggle(item) {
-    await toggleDailyGoal(uid, TODAY, item.id, !state[item.id])
+    const newVal = !state[item.id]
+    await toggleDailyGoal(uid, TODAY, item.id, newVal)
+    if (item.id === 'item_gym' && newVal) {
+      await markGymSession(uid, gymStats)
+    }
   }
 
   return (
@@ -553,4 +602,162 @@ function PomRow({ label, value, color }) {
       <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '13px', fontWeight: 600, color }}>{value}</span>
     </div>
   )
+}
+
+// ── Celebración al 100% ───────────────────────────────────────
+
+const CONFETTI_COLORS = ['#e0bd6b', '#f0d089', '#bd9748', '#f4eee2', '#d9a441', '#ffe9b0']
+const randBetween = (a, b) => a + Math.random() * (b - a)
+const pickRand    = arr => arr[Math.floor(Math.random() * arr.length)]
+
+const CONFETTI_CSS = `
+@keyframes confetti-fall {
+  from { transform: translateY(-15vh); }
+  to   { transform: translateY(115vh); }
+}
+@keyframes confetti-cw  { from { transform: rotate(0deg);    } to { transform: rotate(360deg);  } }
+@keyframes confetti-ccw { from { transform: rotate(0deg);    } to { transform: rotate(-360deg); } }
+@keyframes logo-bounce  { 0% { transform: translateY(0px); } 100% { transform: translateY(-14px); } }
+`
+
+function generateConfetti(n) {
+  return Array.from({ length: n }, (_, id) => ({
+    id,
+    x:        randBetween(0, 100),
+    delay:    randBetween(0, 1.2),
+    duration: randBetween(2.2, 3.8),
+    color:    pickRand(CONFETTI_COLORS),
+    shape:    pickRand(['circle', 'square', 'strip']),
+    size:     randBetween(5, 11),
+    spinDir:  pickRand(['cw', 'ccw']),
+    spinDur:  randBetween(0.6, 1.8),
+  }))
+}
+
+function ConfettiPiece({ x, delay, duration, color, shape, size, spinDir, spinDur }) {
+  const w = shape === 'strip' ? size * 0.35 : size
+  const h = shape === 'strip' ? size * 2.8  : size
+  return (
+    <div style={{
+      position:  'absolute',
+      left:      `${x}%`,
+      top:       0,
+      width:     `${w}px`,
+      height:    `${h}px`,
+      animation: `confetti-fall ${duration}s ${delay}s linear both`,
+    }}>
+      <div style={{
+        width:        '100%',
+        height:       '100%',
+        background:   color,
+        borderRadius: shape === 'circle' ? '50%' : '2px',
+        opacity:      0.88,
+        animation:    `confetti-${spinDir} ${spinDur}s ${delay}s linear infinite`,
+      }} />
+    </div>
+  )
+}
+
+function DayCompleteConfetti({ displayName, streak, onDone }) {
+  const [gone,    setGone]    = useState(false)
+  const [visible, setVisible] = useState(true)
+  const [pieces]              = useState(() => generateConfetti(90))
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setVisible(false), 4500)
+    const t2 = setTimeout(() => { setGone(true); onDone?.() }, 5600)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
+  }, [onDone])
+
+  if (gone) return null
+
+  return (
+    <div style={{
+      position:   'fixed',
+      inset:      0,
+      zIndex:     9999,
+      pointerEvents: 'none',
+      overflow:   'hidden',
+      opacity:    visible ? 1 : 0,
+      transition: 'opacity 1.1s ease',
+    }}>
+      <style>{CONFETTI_CSS}</style>
+      {pieces.map(p => <ConfettiPiece key={p.id} {...p} />)}
+      <div style={{
+        position:       'absolute',
+        inset:          0,
+        display:        'flex',
+        flexDirection:  'column',
+        alignItems:     'center',
+        justifyContent: 'center',
+        gap:            '20px',
+      }}>
+        <img
+          src="/cerebro-logo.png"
+          alt=""
+          style={{
+            width:     64,
+            height:    64,
+            filter:    'drop-shadow(0 0 18px rgba(224,189,107,.55))',
+            animation: 'logo-bounce 0.55s ease-in-out infinite alternate',
+          }}
+        />
+        <div style={{
+          background:   'linear-gradient(135deg, rgba(27,25,41,.96) 0%, rgba(13,12,20,.96) 100%)',
+          border:       '1.5px solid #e0bd6b',
+          borderRadius: '18px',
+          padding:      '28px 40px',
+          textAlign:    'center',
+          boxShadow:    '0 0 52px rgba(224,189,107,.22), 0 0 120px rgba(224,189,107,.07), 0 24px 60px rgba(0,0,0,.7)',
+          maxWidth:     '360px',
+        }}>
+          <div style={{
+            fontFamily:   'var(--font-display)',
+            fontSize:     '21px',
+            fontWeight:   700,
+            color:        'var(--text0)',
+            marginBottom: '10px',
+            lineHeight:   1.35,
+          }}>
+            ¡Día completado, <em style={{ color: '#e0bd6b', fontStyle: 'italic' }}>{displayName}</em>!
+          </div>
+          <div style={{ fontSize: '14px', color: 'var(--text1)', lineHeight: 1.55 }}>
+            Completaste todo lo de hoy. Sigue así. 🔥
+          </div>
+          {streak > 1 && (
+            <div style={{
+              marginTop:    '14px',
+              fontSize:     '13px',
+              color:        '#e0bd6b',
+              fontWeight:   600,
+              letterSpacing: '.01em',
+            }}>
+              Llevas {streak} días completos seguidos ✨
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function celebrationSound() {
+  try {
+    const ctx   = new (window.AudioContext || window.webkitAudioContext)()
+    const notes = [261.63, 329.63, 392.00, 523.25] // C4 E4 G4 C5
+    notes.forEach((freq, i) => {
+      const osc  = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.type            = 'sine'
+      osc.frequency.value = freq
+      const t0 = ctx.currentTime + i * 0.20
+      gain.gain.setValueAtTime(0, t0)
+      gain.gain.linearRampToValueAtTime(0.13, t0 + 0.06)
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.95)
+      osc.start(t0)
+      osc.stop(t0 + 1.05)
+    })
+  } catch (_) {}
 }
