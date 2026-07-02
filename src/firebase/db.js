@@ -391,3 +391,16 @@ export async function addDailyGoalItem(uid, label) {
   await setDoc(ref, { items: arrayUnion({ id, label }) }, { merge: true })
   return id
 }
+
+// ── TASK LABELS ───────────────────────────────────────────────────────────────
+// users/{uid}/settings/task-labels → { labels: [{id, name, color}] }
+
+export function subscribeTaskLabels(uid, callback) {
+  return onSnapshot(doc(db, 'users', uid, 'settings', 'task-labels'), snap => {
+    callback(snap.exists() ? (snap.data().labels || []) : [])
+  })
+}
+
+export async function saveTaskLabels(uid, labels) {
+  await setDoc(doc(db, 'users', uid, 'settings', 'task-labels'), { labels })
+}

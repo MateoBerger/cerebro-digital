@@ -1,5 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { subscribeTareas, addTarea, updateTarea, deleteTarea } from '../firebase/db'
+import {
+  subscribeTareas, addTarea, updateTarea, deleteTarea,
+  subscribeTaskLabels, saveTaskLabels,
+} from '../firebase/db'
 
 // ── Constantes ─────────────────────────────────────────────────────────────────
 
@@ -31,9 +34,30 @@ const PAES_SUBJECTS = [
   { key: 'ciencias', label: 'Ciencias', color: '#2dd4b2', bg: 'rgba(45,212,178,.12)',  border: 'rgba(45,212,178,.3)'  },
 ]
 
+const SORT_OPTIONS = [
+  { key: 'prioridad', label: 'Prioridad' },
+  { key: 'fecha',     label: 'Fecha' },
+  { key: 'alpha',     label: 'A–Z' },
+]
+
+const LABEL_COLORS = [
+  '#f07272', '#f0a740', '#e0bd6b', '#3ec97e',
+  '#5b9cf6', '#c084fc', '#2dd4b2', '#f472b6',
+  '#94a3b8', '#fb923c',
+]
+
+const DAYS_ES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+
+const RECURRENCE_TYPES = [
+  { key: 'none',    label: 'Sin repetición' },
+  { key: 'daily',   label: 'Diaria' },
+  { key: 'weekly',  label: 'Semanal' },
+  { key: 'monthly', label: 'Mensual' },
+]
+
 const EMPTY_FIELDS = {
   titulo: '', descripcion: '', categoria: 'academico', prioridad: 'media',
-  fecha: '', paesSubject: '',
+  fecha: '', paesSubject: '', labelIds: [], recurrence: null,
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -54,21 +78,74 @@ function formatFecha(fechaStr) {
   return { label, overdue: fechaStr < today }
 }
 
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
+function nextRecurrenceDate(rec, currentDateStr) {
+  if (!rec || !rec.type || rec.type === 'none') return null
+  const base = currentDateStr || getLocalDate()
+  const d = new Date(base + 'T12:00:00')
+  if (rec.type === 'daily') {
+    d.setDate(d.getDate() + 1)
+    return d.toISOString().slice(0, 10)
+  }
+  if (rec.type === 'weekly') {
+    const target = rec.dayOfWeek ?? d.getDay()
+    let diff = target - d.getDay()
+    if (diff <= 0) diff += 7
+    d.setDate(d.getDate() + diff)
+    return d.toISOString().slice(0, 10)
+  }
+  if (rec.type === 'monthly') {
+    d.setMonth(d.getMonth() + 1)
+    return d.toISOString().slice(0, 10)
+  }
+  return null
+}
+
+function sortTareas(list, sortKey) {
+  return [...list].sort((a, b) => {
+    if (sortKey === 'fecha') {
+      return (a.fecha || '9999').localeCompare(b.fecha || '9999')
+    }
+    if (sortKey === 'alpha') {
+      return (a.titulo || '').localeCompare(b.titulo || '', 'es')
+    }
+    return (PRIO_META[a.prioridad]?.order ?? 1) - (PRIO_META[b.prioridad]?.order ?? 1)
+  })
+}
+
 // ── Componente principal ───────────────────────────────────────────────────────
 
 export default function TareasTab({ uid }) {
-  const [tareas, setTareas]         = useState([])
-  const [loading, setLoading]       = useState(true)
-  const [form, setForm]             = useState(null)
-  const [saving, setSaving]         = useState(false)
-  const [verComp, setVerComp]       = useState({})
-  const [filterPaes, setFilterPaes] = useState('')
+  const [tareas, setTareas]           = useState([])
+  const [loading, setLoading]         = useState(true)
+  const [form, setForm]               = useState(null)
+  const [saving, setSaving]           = useState(false)
+  const [verComp, setVerComp]         = useState({})
+  const [filterPaes, setFilterPaes]   = useState('')
+  const [labels, setLabels]           = useState([])
+  const [filterLabel, setFilterLabel] = useState('')
+  const [searchText, setSearchText]   = useState('')
+  const [showLblMgr, setShowLblMgr]   = useState(false)
+  const [sortKey, setSortKey]         = useState(
+    () => localStorage.getItem('cd-task-sort') || 'prioridad'
+  )
 
   useEffect(() => {
     if (!uid) return
-    const unsub = subscribeTareas(uid, data => { setTareas(data); setLoading(false) })
-    return unsub
+    const u1 = subscribeTareas(uid, data => { setTareas(data); setLoading(false) })
+    const u2 = subscribeTaskLabels(uid, setLabels)
+    return () => { u1(); u2() }
   }, [uid])
+
+  useEffect(() => {
+    localStorage.setItem('cd-task-sort', sortKey)
+  }, [sortKey])
 
   function openNew(alcance) {
     setForm({ mode: 'new', alcance, ...EMPTY_FIELDS })
@@ -85,6 +162,8 @@ export default function TareasTab({ uid }) {
       prioridad:   t.prioridad || 'media',
       fecha:       t.fecha || '',
       paesSubject: t.paesSubject || '',
+      labelIds:    t.labelIds || [],
+      recurrence:  t.recurrence || null,
     })
   }
 
@@ -103,6 +182,8 @@ export default function TareasTab({ uid }) {
       alcance:     form.alcance,
       fecha:       form.fecha,
       paesSubject: form.paesSubject || '',
+      labelIds:    form.labelIds || [],
+      recurrence:  form.recurrence || null,
     }
     if (form.mode === 'new') {
       await addTarea(uid, { ...payload, subtasks: [] })
@@ -114,11 +195,55 @@ export default function TareasTab({ uid }) {
   }
 
   async function handleToggle(t) {
-    await updateTarea(uid, t.id, { completada: !t.completada })
+    const nowDone = !t.completada
+    await updateTarea(uid, t.id, { completada: nowDone })
+    // On completion of a recurring task → generate next instance once
+    if (nowDone && t.recurrence?.type && t.recurrence.type !== 'none') {
+      const nextFecha = nextRecurrenceDate(t.recurrence, t.fecha)
+      if (nextFecha) {
+        await addTarea(uid, {
+          titulo:      t.titulo,
+          descripcion: t.descripcion || '',
+          categoria:   t.categoria || 'academico',
+          prioridad:   t.prioridad || 'media',
+          alcance:     t.alcance || 'general',
+          fecha:       nextFecha,
+          paesSubject: t.paesSubject || '',
+          labelIds:    t.labelIds || [],
+          recurrence:  t.recurrence,
+          subtasks:    (t.subtasks || []).map(s => ({ ...s, done: false })),
+        })
+      }
+    }
   }
 
-  const hasPaes         = tareas.some(t => t.paesSubject)
-  const totalPendientes = tareas.filter(t => !t.completada).length
+  async function handleDuplicate(t) {
+    await addTarea(uid, {
+      titulo:      t.titulo + ' (copia)',
+      descripcion: t.descripcion || '',
+      categoria:   t.categoria || 'academico',
+      prioridad:   t.prioridad || 'media',
+      alcance:     t.alcance || 'general',
+      fecha:       t.fecha || '',
+      paesSubject: t.paesSubject || '',
+      labelIds:    t.labelIds || [],
+      recurrence:  t.recurrence || null,
+      subtasks:    (t.subtasks || []).map(s => ({ ...s, done: false })),
+    })
+  }
+
+  const hasPaes  = tareas.some(t => t.paesSubject)
+  const totalPen = tareas.filter(t => !t.completada).length
+
+  const filteredTareas = tareas
+    .filter(t => !filterPaes  || t.paesSubject === filterPaes)
+    .filter(t => !filterLabel || (t.labelIds || []).includes(filterLabel))
+    .filter(t => {
+      if (!searchText.trim()) return true
+      const q = searchText.trim().toLowerCase()
+      return (t.titulo || '').toLowerCase().includes(q) ||
+             (t.descripcion || '').toLowerCase().includes(q)
+    })
 
   if (loading) {
     return (
@@ -130,95 +255,177 @@ export default function TareasTab({ uid }) {
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '26px 32px 48px' }}>
+
       {/* ── Header ── */}
-      <div style={{ marginBottom: hasPaes ? '16px' : '32px' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text0)', letterSpacing: '-.4px', marginBottom: '3px' }}>
-          Tareas
-        </h1>
-        <p style={{ fontSize: '12px', color: 'var(--text2)' }}>
-          {totalPendientes > 0
-            ? `${totalPendientes} pendiente${totalPendientes !== 1 ? 's' : ''} en total`
-            : 'Sin pendientes — ¡todo al día!'}
-        </p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <div>
+          <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text0)', letterSpacing: '-.4px', marginBottom: '3px' }}>
+            Tareas
+          </h1>
+          <p style={{ fontSize: '12px', color: 'var(--text2)' }}>
+            {totalPen > 0
+              ? `${totalPen} pendiente${totalPen !== 1 ? 's' : ''} en total`
+              : 'Sin pendientes — ¡todo al día!'}
+          </p>
+        </div>
+        <button
+          onClick={() => setShowLblMgr(v => !v)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '5px',
+            padding: '5px 11px', borderRadius: '7px', marginTop: '2px',
+            border: `1px solid ${showLblMgr ? 'var(--accent-border)' : 'var(--border)'}`,
+            background: showLblMgr ? 'var(--accent-dim)' : 'none',
+            color: showLblMgr ? 'var(--accent)' : 'var(--text1)',
+            fontSize: '11px', fontWeight: 500, cursor: 'pointer',
+            fontFamily: 'Inter, sans-serif', transition: 'all .12s',
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" />
+            <line x1="7" y1="7" x2="7.01" y2="7" />
+          </svg>
+          Etiquetas
+        </button>
       </div>
 
-      {/* ── Filtro PAES (solo si alguna tarea tiene materia asignada) ── */}
-      {hasPaes && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '24px' }}>
-          <span style={{ fontSize: '11px', color: 'var(--text2)', fontWeight: 500, marginRight: '2px' }}>Materia:</span>
-          <button
-            onClick={() => setFilterPaes('')}
+      {/* ── Gestor de etiquetas ── */}
+      {showLblMgr && (
+        <LabelManager
+          labels={labels}
+          onSave={lbls => saveTaskLabels(uid, lbls)}
+          onClose={() => setShowLblMgr(false)}
+        />
+      )}
+
+      {/* ── Barra de búsqueda + ordenar ── */}
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
+        <div style={{
+          flex: 1, display: 'flex', alignItems: 'center', gap: '7px',
+          padding: '6px 11px', borderRadius: '8px',
+          background: 'var(--bg3)', border: '1px solid var(--border)',
+        }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round">
+            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+          </svg>
+          <input
+            value={searchText}
+            onChange={e => setSearchText(e.target.value)}
+            placeholder="Buscar tareas..."
             style={{
-              padding: '3px 10px', borderRadius: '20px', fontSize: '11px',
-              fontWeight: filterPaes === '' ? 600 : 400,
-              border: `1px solid ${filterPaes === '' ? 'var(--accent)' : 'var(--border)'}`,
-              background: filterPaes === '' ? 'var(--accent-dim)' : 'none',
-              color: filterPaes === '' ? 'var(--accent)' : 'var(--text2)',
-              cursor: 'pointer', fontFamily: 'Inter, sans-serif', transition: 'all .12s',
+              flex: 1, background: 'none', border: 'none', outline: 'none',
+              fontSize: '12px', color: 'var(--text1)', fontFamily: 'Inter, sans-serif',
             }}
-          >
-            Todas
-          </button>
-          {PAES_SUBJECTS.map(s => {
-            const active = filterPaes === s.key
-            return (
-              <button key={s.key} onClick={() => setFilterPaes(active ? '' : s.key)} style={{
-                padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: active ? 600 : 400,
-                border: `1px solid ${active ? s.color : 'var(--border)'}`,
-                background: active ? s.bg : 'none',
-                color: active ? s.color : 'var(--text2)',
-                cursor: 'pointer', fontFamily: 'Inter, sans-serif', transition: 'all .12s',
-              }}>
-                {s.label}
-              </button>
-            )
-          })}
+          />
+          {searchText && (
+            <button onClick={() => setSearchText('')} style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'var(--text2)', display: 'flex', alignItems: 'center', padding: 0,
+            }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+        <select
+          value={sortKey}
+          onChange={e => setSortKey(e.target.value)}
+          style={{
+            padding: '6px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 500,
+            border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--text1)',
+            cursor: 'pointer', outline: 'none', fontFamily: 'Inter, sans-serif',
+          }}
+        >
+          {SORT_OPTIONS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+        </select>
+      </div>
+
+      {/* ── Filtro materia PAES ── */}
+      {hasPaes && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+          <span style={{ fontSize: '11px', color: 'var(--text2)', fontWeight: 500 }}>Materia:</span>
+          <FilterPill active={filterPaes === ''} color="var(--accent)" onClick={() => setFilterPaes('')}>Todas</FilterPill>
+          {PAES_SUBJECTS.map(s => (
+            <FilterPill key={s.key} active={filterPaes === s.key} color={s.color}
+              onClick={() => setFilterPaes(filterPaes === s.key ? '' : s.key)}>
+              {s.label}
+            </FilterPill>
+          ))}
+        </div>
+      )}
+
+      {/* ── Filtro etiquetas ── */}
+      {labels.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '20px' }}>
+          <span style={{ fontSize: '11px', color: 'var(--text2)', fontWeight: 500 }}>Etiqueta:</span>
+          <FilterPill active={filterLabel === ''} color="var(--accent)" onClick={() => setFilterLabel('')}>Todas</FilterPill>
+          {labels.map(lbl => (
+            <FilterPill key={lbl.id} active={filterLabel === lbl.id} color={lbl.color}
+              onClick={() => setFilterLabel(filterLabel === lbl.id ? '' : lbl.id)}>
+              {lbl.name}
+            </FilterPill>
+          ))}
         </div>
       )}
 
       {/* ── Tres secciones ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '36px', maxWidth: '740px' }}>
-        {ALCANCES.map(alc => {
-          const tareasAlc = tareas
-            .filter(t => (t.alcance || 'general') === alc.key)
-            .filter(t => !filterPaes || t.paesSubject === filterPaes)
-          return (
-            <TareaSeccion
-              key={alc.key}
-              uid={uid}
-              alc={alc}
-              tareas={tareasAlc}
-              form={form}
-              setField={setField}
-              onOpenNew={() => openNew(alc.key)}
-              onOpenEdit={openEdit}
-              onCancelForm={() => setForm(null)}
-              onSave={handleSave}
-              onToggle={handleToggle}
-              onDelete={id => deleteTarea(uid, id)}
-              saving={saving}
-              verComp={!!verComp[alc.key]}
-              onToggleComp={() => setVerComp(v => ({ ...v, [alc.key]: !v[alc.key] }))}
-            />
-          )
-        })}
+        {ALCANCES.map(alc => (
+          <TareaSeccion
+            key={alc.key}
+            uid={uid}
+            alc={alc}
+            tareas={filteredTareas.filter(t => (t.alcance || 'general') === alc.key)}
+            labels={labels}
+            sortKey={sortKey}
+            form={form}
+            setField={setField}
+            onOpenNew={() => openNew(alc.key)}
+            onOpenEdit={openEdit}
+            onCancelForm={() => setForm(null)}
+            onSave={handleSave}
+            onToggle={handleToggle}
+            onDelete={id => deleteTarea(uid, id)}
+            onDuplicate={handleDuplicate}
+            saving={saving}
+            verComp={!!verComp[alc.key]}
+            onToggleComp={() => setVerComp(v => ({ ...v, [alc.key]: !v[alc.key] }))}
+          />
+        ))}
       </div>
     </div>
   )
 }
 
+// ── Pill de filtro reutilizable ────────────────────────────────────────────────
+
+function FilterPill({ active, color, onClick, children }) {
+  const bg = active
+    ? (color.startsWith('#') ? hexToRgba(color, .12) : 'var(--accent-dim)')
+    : 'none'
+  return (
+    <button onClick={onClick} style={{
+      padding: '3px 10px', borderRadius: '20px', fontSize: '11px',
+      fontWeight: active ? 600 : 400,
+      border: `1px solid ${active ? color : 'var(--border)'}`,
+      background: bg,
+      color: active ? color : 'var(--text2)',
+      cursor: 'pointer', fontFamily: 'Inter, sans-serif', transition: 'all .12s',
+    }}>
+      {children}
+    </button>
+  )
+}
+
 // ── Sección ────────────────────────────────────────────────────────────────────
 
-function TareaSeccion({ uid, alc, tareas, form, setField, onOpenNew, onOpenEdit, onCancelForm, onSave, onToggle, onDelete, saving, verComp, onToggleComp }) {
+function TareaSeccion({ uid, alc, tareas, labels, sortKey, form, setField, onOpenNew, onOpenEdit, onCancelForm, onSave, onToggle, onDelete, onDuplicate, saving, verComp, onToggleComp }) {
   const isNewHere  = form?.mode === 'new' && form.alcance === alc.key
-  const pendientes = tareas
-    .filter(t => !t.completada)
-    .sort((a, b) => (PRIO_META[a.prioridad]?.order ?? 1) - (PRIO_META[b.prioridad]?.order ?? 1))
+  const pendientes = sortTareas(tareas.filter(t => !t.completada), sortKey)
   const completadas = tareas.filter(t => t.completada)
 
   return (
     <section>
-      {/* ── Cabecera de sección ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ width: '3px', height: '20px', borderRadius: '2px', background: alc.color, flexShrink: 0 }} />
@@ -237,60 +444,35 @@ function TareaSeccion({ uid, alc, tareas, form, setField, onOpenNew, onOpenEdit,
         <SectionBtn active={isNewHere} onClick={isNewHere ? onCancelForm : onOpenNew} />
       </div>
 
-      {/* ── Formulario nueva tarea ── */}
       {isNewHere && (
-        <TareaForm
-          value={form}
-          setField={setField}
-          onSave={onSave}
-          onCancel={onCancelForm}
-          saving={saving}
-          mode="new"
-        />
+        <TareaForm value={form} setField={setField} labels={labels}
+          onSave={onSave} onCancel={onCancelForm} saving={saving} mode="new" />
       )}
 
-      {/* ── Empty state ── */}
       {pendientes.length === 0 && completadas.length === 0 && !isNewHere && (
-        <div style={{
-          padding: '18px 0 10px', display: 'flex', alignItems: 'center', gap: '10px',
-          borderTop: '1px dashed var(--border)',
-        }}>
+        <div style={{ padding: '18px 0 10px', borderTop: '1px dashed var(--border)' }}>
           <span style={{ fontSize: '12px', color: 'var(--text2)' }}>Sin tareas · presioná Agregar para empezar</span>
         </div>
       )}
 
-      {/* ── Lista de pendientes ── */}
       {pendientes.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
           {pendientes.map(t => {
             if (form?.mode === 'edit' && form.id === t.id) {
               return (
-                <TareaForm
-                  key={t.id}
-                  value={form}
-                  setField={setField}
-                  onSave={onSave}
-                  onCancel={onCancelForm}
-                  saving={saving}
-                  mode="edit"
-                />
+                <TareaForm key={t.id} value={form} setField={setField} labels={labels}
+                  onSave={onSave} onCancel={onCancelForm} saving={saving} mode="edit" />
               )
             }
             return (
-              <TareaItem
-                key={t.id}
-                uid={uid}
-                tarea={t}
-                onToggle={onToggle}
-                onEdit={() => onOpenEdit(t)}
-                onDelete={() => onDelete(t.id)}
-              />
+              <TareaItem key={t.id} uid={uid} tarea={t} labels={labels}
+                onToggle={onToggle} onEdit={() => onOpenEdit(t)}
+                onDelete={() => onDelete(t.id)} onDuplicate={() => onDuplicate(t)} />
             )
           })}
         </div>
       )}
 
-      {/* ── Completadas colapsable ── */}
       {completadas.length > 0 && (
         <div style={{ marginTop: pendientes.length > 0 ? '14px' : '0' }}>
           <button
@@ -314,14 +496,9 @@ function TareaSeccion({ uid, alc, tareas, form, setField, onOpenNew, onOpenEdit,
           {verComp && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
               {completadas.map(t => (
-                <TareaItem
-                  key={t.id}
-                  uid={uid}
-                  tarea={t}
-                  onToggle={onToggle}
-                  onEdit={() => onOpenEdit(t)}
-                  onDelete={() => onDelete(t.id)}
-                />
+                <TareaItem key={t.id} uid={uid} tarea={t} labels={labels}
+                  onToggle={onToggle} onEdit={() => onOpenEdit(t)}
+                  onDelete={() => onDelete(t.id)} onDuplicate={() => onDuplicate(t)} />
               ))}
             </div>
           )}
@@ -336,13 +513,9 @@ function TareaSeccion({ uid, alc, tareas, form, setField, onOpenNew, onOpenEdit,
 function SectionBtn({ active, onClick }) {
   const [hov, setHov] = useState(false)
   return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
+    <button onClick={onClick} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{
-        display: 'flex', alignItems: 'center', gap: '5px',
-        padding: '5px 12px', borderRadius: '7px',
+        display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 12px', borderRadius: '7px',
         border: `1px solid ${active || hov ? 'var(--border-hi)' : 'var(--border)'}`,
         background: active ? 'var(--bg3)' : 'none',
         color: hov ? 'var(--text0)' : 'var(--text1)',
@@ -360,15 +533,12 @@ function SectionBtn({ active, onClick }) {
 
 // ── Tarjeta de tarea ───────────────────────────────────────────────────────────
 
-function TareaItem({ uid, tarea, onToggle, onEdit, onDelete }) {
-  const [hov, setHov]             = useState(false)
-  const [removing, setRemoving]   = useState(false)
-  const [showSubs, setShowSubs]   = useState(false)
+function TareaItem({ uid, tarea, labels, onToggle, onEdit, onDelete, onDuplicate }) {
+  const [hov, setHov]           = useState(false)
+  const [removing, setRemoving] = useState(false)
+  const [showSubs, setShowSubs] = useState(false)
 
-  function handleDelete() {
-    setRemoving(true)
-    setTimeout(onDelete, 180)
-  }
+  function handleDelete() { setRemoving(true); setTimeout(onDelete, 180) }
 
   const cat      = CAT_META[tarea.categoria]  || CAT_META.academico
   const prio     = PRIO_META[tarea.prioridad] || PRIO_META.media
@@ -378,6 +548,8 @@ function TareaItem({ uid, tarea, onToggle, onEdit, onDelete }) {
   const subsDone = subs.filter(s => s.done).length
   const hasSubs  = subs.length > 0
   const paes     = PAES_SUBJECTS.find(s => s.key === tarea.paesSubject)
+  const isRecurring = tarea.recurrence?.type && tarea.recurrence.type !== 'none'
+  const taskLabels  = (tarea.labelIds || []).map(id => labels.find(l => l.id === id)).filter(Boolean)
 
   return (
     <div
@@ -386,49 +558,42 @@ function TareaItem({ uid, tarea, onToggle, onEdit, onDelete }) {
       onMouseLeave={() => setHov(false)}
       style={{
         display: 'flex', alignItems: 'flex-start', gap: '10px',
-        padding: '12px 12px 12px 0',
-        borderRadius: 'var(--radius-sm)',
+        padding: '12px 12px 12px 0', borderRadius: 'var(--radius-sm)',
         borderTop:    `1px solid ${hov && !done ? 'var(--accent-border)' : 'var(--border)'}`,
         borderRight:  `1px solid ${hov && !done ? 'var(--accent-border)' : 'var(--border)'}`,
         borderBottom: `1px solid ${hov && !done ? 'var(--accent-border)' : 'var(--border)'}`,
         borderLeft:   `3px solid ${done ? 'var(--border)' : prio.color}`,
         background:   hov ? 'linear-gradient(160deg, var(--bg3), var(--bg2))' : 'var(--bg1)',
-        boxShadow:    hov && !done
-          ? '0 6px 22px rgba(0,0,0,.28), 0 0 0 1px rgba(224,189,107,.1)'
-          : 'var(--shadow-sm)',
+        boxShadow:    hov && !done ? '0 6px 22px rgba(0,0,0,.28), 0 0 0 1px rgba(224,189,107,.1)' : 'var(--shadow-sm)',
         transform:    hov ? 'translateY(-2px)' : 'translateY(0)',
         opacity:      done ? .48 : 1,
         transition:   'background .15s, box-shadow .2s, transform .2s, opacity .2s, border-color .2s',
       }}
     >
-      {/* ── Checkbox circular ── */}
+      {/* Checkbox */}
       <div style={{ paddingLeft: '14px', paddingTop: '1px', flexShrink: 0 }}>
-        <button
-          onClick={() => onToggle(tarea)}
-          title={done ? 'Marcar pendiente' : 'Marcar completada'}
+        <button onClick={() => onToggle(tarea)} title={done ? 'Marcar pendiente' : 'Marcar completada'}
           style={{
             width: '20px', height: '20px', borderRadius: '50%',
             border: `2px solid ${done ? '#3ec97e' : (hov ? 'var(--text1)' : 'var(--border-hi)')}`,
             background: done ? 'rgba(62,201,126,.14)' : 'none',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', transition: 'border-color .18s, background .18s',
-            flexShrink: 0,
+            cursor: 'pointer', transition: 'border-color .18s, background .18s', flexShrink: 0,
           }}
         >
           {done && (
-            <svg key="done" className="check-pop" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#3ec97e" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg className="check-pop" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#3ec97e" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20 6L9 17l-5-5" />
             </svg>
           )}
         </button>
       </div>
 
-      {/* ── Contenido ── */}
+      {/* Contenido */}
       <div style={{ flex: 1, minWidth: 0 }}>
         {/* Título */}
         <span style={{
-          display: 'block',
-          fontSize: '13px', lineHeight: '1.45', fontFamily: 'Inter, sans-serif',
+          display: 'block', fontSize: '13px', lineHeight: '1.45', fontFamily: 'Inter, sans-serif',
           color:          done ? 'var(--text2)' : 'var(--text0)',
           fontWeight:     tarea.prioridad === 'alta' && !done ? 600 : 400,
           textDecoration: done ? 'line-through' : 'none',
@@ -449,29 +614,18 @@ function TareaItem({ uid, tarea, onToggle, onEdit, onDelete }) {
           </p>
         )}
 
-        {/* Subtareas: barra de progreso si hay, o botón "+ Subtarea" si no hay */}
+        {/* Subtareas: barra si hay, botón + si no */}
         {hasSubs ? (
-          <button
-            onClick={() => setShowSubs(v => !v)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '5px',
-              background: 'none', border: 'none', cursor: 'pointer',
-              padding: '0', marginBottom: '8px',
-            }}
-          >
+          <button onClick={() => setShowSubs(v => !v)}
+            style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', cursor: 'pointer', padding: '0', marginBottom: '8px' }}>
             <div style={{ width: '50px', height: '3px', borderRadius: '2px', background: 'var(--border)', overflow: 'hidden', flexShrink: 0 }}>
               <div style={{
                 height: '100%', borderRadius: '2px',
                 background: subsDone === subs.length ? '#3ec97e' : 'var(--accent)',
-                width: `${(subsDone / subs.length) * 100}%`,
-                transition: 'width .3s ease',
+                width: `${(subsDone / subs.length) * 100}%`, transition: 'width .3s ease',
               }} />
             </div>
-            <span style={{
-              fontSize: '10px', fontFamily: "'IBM Plex Mono', monospace",
-              color: subsDone === subs.length ? '#3ec97e' : '#e0bd6b',
-              fontWeight: 500,
-            }}>
+            <span style={{ fontSize: '10px', fontFamily: "'IBM Plex Mono', monospace", color: subsDone === subs.length ? '#3ec97e' : '#e0bd6b', fontWeight: 500 }}>
               {subsDone}/{subs.length}
             </span>
             <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2.5" strokeLinecap="round"
@@ -480,16 +634,13 @@ function TareaItem({ uid, tarea, onToggle, onEdit, onDelete }) {
             </svg>
           </button>
         ) : (
-          <button
-            onClick={() => setShowSubs(true)}
+          <button onClick={() => setShowSubs(true)}
             style={{
-              display: 'flex', alignItems: 'center', gap: '4px',
-              background: 'none', border: 'none', cursor: 'pointer',
-              padding: '0', marginBottom: '8px',
+              display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none',
+              cursor: 'pointer', padding: '0', marginBottom: '8px',
               color: 'var(--text2)', fontSize: '11px', fontFamily: 'Inter, sans-serif',
               opacity: hov ? 1 : 0, transition: 'opacity .15s',
-            }}
-          >
+            }}>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <path d="M12 5v14M5 12h14" />
             </svg>
@@ -497,10 +648,9 @@ function TareaItem({ uid, tarea, onToggle, onEdit, onDelete }) {
           </button>
         )}
 
-        {/* Panel de subtareas expandido */}
         {showSubs && <SubtaskPanel uid={uid} tarea={tarea} />}
 
-        {/* ── Fila inferior: badges + acciones ── */}
+        {/* Badges */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
           {/* Categoría */}
           <span style={{
@@ -522,12 +672,30 @@ function TareaItem({ uid, tarea, onToggle, onEdit, onDelete }) {
             </span>
           )}
 
-          {/* Prioridad (alta siempre; media en hover; baja nunca) */}
-          {(!done && (tarea.prioridad === 'alta' || hov)) && tarea.prioridad !== 'baja' && (
-            <span style={{
-              display: 'flex', alignItems: 'center', gap: '3px',
-              fontSize: '10px', fontWeight: 600, color: prio.color, flexShrink: 0,
+          {/* Etiquetas */}
+          {taskLabels.map(lbl => (
+            <span key={lbl.id} style={{
+              fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: '20px',
+              background: hexToRgba(lbl.color, .14),
+              color: lbl.color,
+              border: `1px solid ${hexToRgba(lbl.color, .35)}`,
+              letterSpacing: '.1px', flexShrink: 0,
             }}>
+              {lbl.name}
+            </span>
+          ))}
+
+          {/* Ícono recurrencia */}
+          {isRecurring && (
+            <span style={{ fontSize: '11px', flexShrink: 0, lineHeight: 1 }}
+              title={`Repite: ${tarea.recurrence.type === 'daily' ? 'diaria' : tarea.recurrence.type === 'weekly' ? `cada ${DAYS_ES[tarea.recurrence.dayOfWeek ?? 0]}` : 'mensual'}`}>
+              🔁
+            </span>
+          )}
+
+          {/* Prioridad */}
+          {(!done && (tarea.prioridad === 'alta' || hov)) && tarea.prioridad !== 'baja' && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px', fontWeight: 600, color: prio.color, flexShrink: 0 }}>
               <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: prio.color }} />
               {prio.label}
             </span>
@@ -544,12 +712,18 @@ function TareaItem({ uid, tarea, onToggle, onEdit, onDelete }) {
             </span>
           )}
 
-          {/* Acciones (aparecen en hover) */}
+          {/* Acciones hover */}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: '3px', opacity: hov ? 1 : 0, transition: 'opacity .15s' }}>
             <IconBtn onClick={onEdit} title="Editar" hoverColor="var(--accent)" hoverBg="var(--accent-dim)">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
                 <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+            </IconBtn>
+            <IconBtn onClick={onDuplicate} title="Duplicar" hoverColor="var(--text1)" hoverBg="var(--bg3)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
               </svg>
             </IconBtn>
             <IconBtn onClick={handleDelete} title="Eliminar" hoverColor="#f07272" hoverBg="rgba(240,114,114,.1)">
@@ -573,102 +747,48 @@ function SubtaskPanel({ uid, tarea }) {
   const [editText, setEditText]   = useState('')
   const inputRef = useRef(null)
   const editRef  = useRef(null)
+  const subs     = tarea.subtasks || []
 
-  const subs = tarea.subtasks || []
-
-  useEffect(() => {
-    if (inputRef.current) inputRef.current.focus()
-  }, [])
-
-  useEffect(() => {
-    if (editingId && editRef.current) editRef.current.focus()
-  }, [editingId])
+  useEffect(() => { if (inputRef.current) inputRef.current.focus() }, [])
+  useEffect(() => { if (editingId && editRef.current) editRef.current.focus() }, [editingId])
 
   async function toggleSub(sub) {
-    const updated = subs.map(s => s.id === sub.id ? { ...s, done: !s.done } : s)
-    await updateTarea(uid, tarea.id, { subtasks: updated })
+    await updateTarea(uid, tarea.id, { subtasks: subs.map(s => s.id === sub.id ? { ...s, done: !s.done } : s) })
   }
-
   async function addSub() {
     const text = newText.trim()
     if (!text) return
-    const sub = { id: 'sub_' + Date.now(), text, done: false }
-    await updateTarea(uid, tarea.id, { subtasks: [...subs, sub] })
+    await updateTarea(uid, tarea.id, { subtasks: [...subs, { id: 'sub_' + Date.now(), text, done: false }] })
     setNewText('')
   }
-
   async function deleteSub(subId) {
     await updateTarea(uid, tarea.id, { subtasks: subs.filter(s => s.id !== subId) })
   }
-
   async function commitEdit(subId) {
     const text = editText.trim()
     if (!text) { setEditingId(null); return }
-    const updated = subs.map(s => s.id === subId ? { ...s, text } : s)
-    await updateTarea(uid, tarea.id, { subtasks: updated })
+    await updateTarea(uid, tarea.id, { subtasks: subs.map(s => s.id === subId ? { ...s, text } : s) })
     setEditingId(null)
   }
 
-  function startEdit(sub) {
-    setEditingId(sub.id)
-    setEditText(sub.text)
-  }
-
   return (
-    <div style={{
-      marginBottom: '8px',
-      padding: '8px 10px 6px',
-      background: 'var(--bg3)',
-      borderRadius: '8px',
-      border: '1px solid var(--border)',
-    }}>
+    <div style={{ marginBottom: '8px', padding: '8px 10px 6px', background: 'var(--bg3)', borderRadius: '8px', border: '1px solid var(--border)' }}>
       {subs.map(sub => (
-        <SubtaskRow
-          key={sub.id}
-          sub={sub}
-          isEditing={editingId === sub.id}
-          editText={editText}
-          editRef={editRef}
-          onToggle={() => toggleSub(sub)}
-          onDelete={() => deleteSub(sub.id)}
-          onDoubleClick={() => startEdit(sub)}
+        <SubtaskRow key={sub.id} sub={sub} isEditing={editingId === sub.id} editText={editText} editRef={editRef}
+          onToggle={() => toggleSub(sub)} onDelete={() => deleteSub(sub.id)}
+          onDoubleClick={() => { setEditingId(sub.id); setEditText(sub.text) }}
           onEditChange={setEditText}
-          onEditKeyDown={e => {
-            if (e.key === 'Enter') { e.preventDefault(); commitEdit(sub.id) }
-            if (e.key === 'Escape') setEditingId(null)
-          }}
-          onEditBlur={() => commitEdit(sub.id)}
-        />
+          onEditKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitEdit(sub.id) } if (e.key === 'Escape') setEditingId(null) }}
+          onEditBlur={() => commitEdit(sub.id)} />
       ))}
-
-      {/* Agregar nueva subtarea */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: subs.length > 0 ? '4px' : '0' }}>
-        <div style={{
-          width: '14px', height: '14px', borderRadius: '4px',
-          border: '1.5px dashed var(--border)', flexShrink: 0,
-        }} />
-        <input
-          ref={inputRef}
-          value={newText}
-          onChange={e => setNewText(e.target.value)}
+        <div style={{ width: '14px', height: '14px', borderRadius: '4px', border: '1.5px dashed var(--border)', flexShrink: 0 }} />
+        <input ref={inputRef} value={newText} onChange={e => setNewText(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSub() } }}
           placeholder="Nueva subtarea..."
-          style={{
-            flex: 1, background: 'none', border: 'none', outline: 'none',
-            fontSize: '12px', color: 'var(--text1)', fontFamily: 'Inter, sans-serif',
-          }}
-        />
+          style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: '12px', color: 'var(--text1)', fontFamily: 'Inter, sans-serif' }} />
         {newText.trim() && (
-          <button
-            onClick={addSub}
-            style={{
-              background: 'var(--accent)', border: 'none', borderRadius: '5px',
-              color: '#1a1608', fontSize: '11px', fontWeight: 700,
-              padding: '2px 8px', cursor: 'pointer', fontFamily: 'Inter, sans-serif',
-            }}
-          >
-            +
-          </button>
+          <button onClick={addSub} style={{ background: 'var(--accent)', border: 'none', borderRadius: '5px', color: '#1a1608', fontSize: '11px', fontWeight: 700, padding: '2px 8px', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>+</button>
         )}
       </div>
     </div>
@@ -679,73 +799,37 @@ function SubtaskPanel({ uid, tarea }) {
 
 function SubtaskRow({ sub, isEditing, editText, editRef, onToggle, onDelete, onDoubleClick, onEditChange, onEditKeyDown, onEditBlur }) {
   const [hov, setHov] = useState(false)
-
   return (
-    <div
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '3px 0', minHeight: '24px' }}
-    >
-      {/* Checkbox dorado */}
-      <button
-        onClick={onToggle}
-        style={{
-          width: '14px', height: '14px', borderRadius: '4px', flexShrink: 0,
-          border: `1.5px solid ${sub.done ? '#e0bd6b' : 'var(--border-hi)'}`,
-          background: sub.done ? 'rgba(224,189,107,.18)' : 'none',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', transition: 'all .14s',
-        }}
-      >
+    <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '3px 0', minHeight: '24px' }}>
+      <button onClick={onToggle} style={{
+        width: '14px', height: '14px', borderRadius: '4px', flexShrink: 0,
+        border: `1.5px solid ${sub.done ? '#e0bd6b' : 'var(--border-hi)'}`,
+        background: sub.done ? 'rgba(224,189,107,.18)' : 'none',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', transition: 'all .14s',
+      }}>
         {sub.done && (
           <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#e0bd6b" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M20 6L9 17l-5-5" />
           </svg>
         )}
       </button>
-
-      {/* Texto / input edición */}
       {isEditing ? (
-        <input
-          ref={editRef}
-          value={editText}
-          onChange={e => onEditChange(e.target.value)}
-          onKeyDown={onEditKeyDown}
-          onBlur={onEditBlur}
-          style={{
-            flex: 1, background: 'none', border: 'none', outline: 'none',
-            fontSize: '12px', color: 'var(--text0)', fontFamily: 'Inter, sans-serif',
-            borderBottom: '1px solid var(--accent)', paddingBottom: '1px',
-          }}
-        />
+        <input ref={editRef} value={editText} onChange={e => onEditChange(e.target.value)}
+          onKeyDown={onEditKeyDown} onBlur={onEditBlur}
+          style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: '12px', color: 'var(--text0)', fontFamily: 'Inter, sans-serif', borderBottom: '1px solid var(--accent)', paddingBottom: '1px' }} />
       ) : (
-        <span
-          onDoubleClick={onDoubleClick}
-          title="Doble clic para editar"
-          style={{
-            flex: 1, fontSize: '12px', lineHeight: 1.4, fontFamily: 'Inter, sans-serif',
-            color: sub.done ? 'var(--text2)' : 'var(--text1)',
-            textDecoration: sub.done ? 'line-through' : 'none',
-            cursor: 'text', userSelect: 'none',
-          }}
-        >
+        <span onDoubleClick={onDoubleClick} title="Doble clic para editar"
+          style={{ flex: 1, fontSize: '12px', lineHeight: 1.4, fontFamily: 'Inter, sans-serif', color: sub.done ? 'var(--text2)' : 'var(--text1)', textDecoration: sub.done ? 'line-through' : 'none', cursor: 'text', userSelect: 'none' }}>
           {sub.text}
         </span>
       )}
-
-      {/* Eliminar (hover) */}
       {!isEditing && hov && (
-        <button
-          onClick={onDelete}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: 'var(--text2)', padding: '2px', borderRadius: '4px',
-            display: 'flex', alignItems: 'center', flexShrink: 0,
-            transition: 'color .1s',
-          }}
+        <button onClick={onDelete}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', padding: '2px', borderRadius: '4px', display: 'flex', alignItems: 'center', flexShrink: 0, transition: 'color .1s' }}
           onMouseEnter={e => e.currentTarget.style.color = '#f07272'}
-          onMouseLeave={e => e.currentTarget.style.color = 'var(--text2)'}
-        >
+          onMouseLeave={e => e.currentTarget.style.color = 'var(--text2)'}>
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
             <path d="M18 6L6 18M6 6l12 12" />
           </svg>
@@ -760,20 +844,12 @@ function SubtaskRow({ sub, isEditing, editText, editRef, onToggle, onDelete, onD
 function IconBtn({ onClick, title, children, hoverColor, hoverBg }) {
   const [hov, setHov] = useState(false)
   return (
-    <button
-      onClick={onClick}
-      title={title}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
+    <button onClick={onClick} title={title} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{
-        width: '26px', height: '26px',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: hov ? hoverBg  : 'none',
-        border: 'none', borderRadius: '6px', cursor: 'pointer',
-        color: hov ? hoverColor : 'var(--text2)',
-        transition: 'color .1s, background .1s',
-      }}
-    >
+        width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: hov ? hoverBg : 'none', border: 'none', borderRadius: '6px', cursor: 'pointer',
+        color: hov ? hoverColor : 'var(--text2)', transition: 'color .1s, background .1s',
+      }}>
       {children}
     </button>
   )
@@ -781,51 +857,67 @@ function IconBtn({ onClick, title, children, hoverColor, hoverBg }) {
 
 // ── Formulario (nuevo + editar) ────────────────────────────────────────────────
 
-function TareaForm({ value, setField, onSave, onCancel, saving, mode }) {
+function TareaForm({ value, setField, labels, onSave, onCancel, saving, mode }) {
   const canSave = !!value.titulo.trim() && !saving
+
+  function toggleLabel(id) {
+    const ids = value.labelIds || []
+    setField('labelIds', ids.includes(id) ? ids.filter(i => i !== id) : [...ids, id])
+  }
+
+  function setRecType(type) {
+    if (type === 'none') return setField('recurrence', null)
+    if (type === 'weekly') {
+      const existing = value.recurrence?.dayOfWeek
+      return setField('recurrence', { type: 'weekly', dayOfWeek: existing ?? new Date().getDay() })
+    }
+    setField('recurrence', { type })
+  }
+
+  const recType = value.recurrence?.type || 'none'
 
   return (
     <div style={{
       background: 'linear-gradient(160deg, var(--bg3) 0%, var(--bg2) 100%)',
-      border: '1px solid var(--accent-border)',
-      borderRadius: 'var(--radius)', padding: '16px 16px 14px',
-      marginBottom: '6px',
+      border: '1px solid var(--accent-border)', borderRadius: 'var(--radius)',
+      padding: '16px 16px 14px', marginBottom: '6px',
       boxShadow: '0 8px 24px -8px rgba(0,0,0,.5), 0 0 0 1px var(--accent-border)',
       animation: 'slideUp .2s cubic-bezier(.25,.46,.45,.94) both',
     }}>
-      {/* ── Título ── */}
-      <input
-        autoFocus
-        placeholder="Título de la tarea..."
-        value={value.titulo}
+      {/* Título */}
+      <input autoFocus placeholder="Título de la tarea..." value={value.titulo}
         onChange={e => setField('titulo', e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSave() } }}
-        style={{
-          width: '100%', background: 'none', border: 'none', outline: 'none',
-          color: 'var(--text0)', fontSize: '14px', fontWeight: 500,
-          fontFamily: 'Inter, sans-serif', marginBottom: '10px',
-        }}
-      />
+        style={{ width: '100%', background: 'none', border: 'none', outline: 'none', color: 'var(--text0)', fontSize: '14px', fontWeight: 500, fontFamily: 'Inter, sans-serif', marginBottom: '10px' }} />
 
-      {/* ── Descripción ── */}
-      <textarea
-        placeholder="Descripción (opcional)..."
-        value={value.descripcion}
-        onChange={e => setField('descripcion', e.target.value)}
-        rows={2}
-        style={{
-          width: '100%', background: 'none', resize: 'none',
-          border: 'none', borderTop: '1px solid var(--border)', outline: 'none',
-          color: 'var(--text1)', fontSize: '12px', lineHeight: 1.6,
-          fontFamily: 'Inter, sans-serif', padding: '10px 0 12px',
-        }}
-      />
+      {/* Descripción */}
+      <textarea placeholder="Descripción (opcional)..." value={value.descripcion}
+        onChange={e => setField('descripcion', e.target.value)} rows={2}
+        style={{ width: '100%', background: 'none', resize: 'none', border: 'none', borderTop: '1px solid var(--border)', outline: 'none', color: 'var(--text1)', fontSize: '12px', lineHeight: 1.6, fontFamily: 'Inter, sans-serif', padding: '10px 0 12px' }} />
 
-      {/* ── Materia PAES ── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap',
-        marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px solid var(--border)',
-      }}>
+      {/* Etiquetas (solo si hay etiquetas creadas) */}
+      {labels.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px solid var(--border)' }}>
+          <span style={{ fontSize: '11px', color: 'var(--text2)', fontWeight: 500, marginRight: '2px' }}>Etiquetas:</span>
+          {labels.map(lbl => {
+            const active = (value.labelIds || []).includes(lbl.id)
+            return (
+              <button key={lbl.id} onClick={() => toggleLabel(lbl.id)} style={{
+                padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: active ? 600 : 400,
+                border: `1px solid ${active ? lbl.color : 'var(--border)'}`,
+                background: active ? hexToRgba(lbl.color, .14) : 'none',
+                color: active ? lbl.color : 'var(--text2)',
+                cursor: 'pointer', fontFamily: 'Inter, sans-serif', transition: 'all .1s',
+              }}>
+                {lbl.name}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Materia PAES */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px solid var(--border)' }}>
         <span style={{ fontSize: '11px', color: 'var(--text2)', fontWeight: 500, marginRight: '2px' }}>Materia:</span>
         {PAES_SUBJECTS.map(s => {
           const active = value.paesSubject === s.key
@@ -833,8 +925,7 @@ function TareaForm({ value, setField, onSave, onCancel, saving, mode }) {
             <button key={s.key} onClick={() => setField('paesSubject', active ? '' : s.key)} style={{
               padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: active ? 700 : 400,
               border: `1px solid ${active ? s.color : 'var(--border)'}`,
-              background: active ? s.bg : 'none',
-              color: active ? s.color : 'var(--text2)',
+              background: active ? s.bg : 'none', color: active ? s.color : 'var(--text2)',
               cursor: 'pointer', fontFamily: 'Inter, sans-serif', transition: 'all .1s',
             }}>
               {s.label}
@@ -842,30 +933,65 @@ function TareaForm({ value, setField, onSave, onCancel, saving, mode }) {
           )
         })}
         {value.paesSubject && (
-          <button onClick={() => setField('paesSubject', '')} style={{
-            padding: '3px 7px', borderRadius: '20px', fontSize: '10px',
-            border: '1px solid var(--border)', background: 'none',
-            color: 'var(--text2)', cursor: 'pointer', fontFamily: 'Inter, sans-serif',
-          }}>✕</button>
+          <button onClick={() => setField('paesSubject', '')} style={{ padding: '3px 7px', borderRadius: '20px', fontSize: '10px', border: '1px solid var(--border)', background: 'none', color: 'var(--text2)', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>✕</button>
         )}
       </div>
 
-      {/* ── Fila 1: categoría + prioridad ── */}
+      {/* Repetición */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px solid var(--border)' }}>
+        <span style={{ fontSize: '11px', color: 'var(--text2)', fontWeight: 500, paddingTop: '4px', whiteSpace: 'nowrap' }}>Repetición:</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+            {RECURRENCE_TYPES.map(rt => {
+              const active = recType === rt.key
+              return (
+                <button key={rt.key} onClick={() => setRecType(rt.key)} style={{
+                  padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: active ? 600 : 400,
+                  border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                  background: active ? 'var(--accent-dim)' : 'none',
+                  color: active ? 'var(--accent)' : 'var(--text2)',
+                  cursor: 'pointer', fontFamily: 'Inter, sans-serif', transition: 'all .1s',
+                }}>
+                  {rt.label}
+                </button>
+              )
+            })}
+          </div>
+          {recType === 'weekly' && (
+            <div style={{ display: 'flex', gap: '3px' }}>
+              {DAYS_ES.map((d, i) => {
+                const active = (value.recurrence?.dayOfWeek ?? new Date().getDay()) === i
+                return (
+                  <button key={i} onClick={() => setField('recurrence', { ...value.recurrence, dayOfWeek: i })}
+                    style={{
+                      width: '34px', height: '24px', borderRadius: '6px', fontSize: '10px',
+                      fontWeight: active ? 700 : 400,
+                      border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                      background: active ? 'var(--accent-dim)' : 'none',
+                      color: active ? 'var(--accent)' : 'var(--text2)',
+                      cursor: 'pointer', fontFamily: 'Inter, sans-serif', transition: 'all .1s',
+                    }}>
+                    {d}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Categoría + prioridad */}
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '10px' }}>
         <CatSelect value={value.categoria} onChange={v => setField('categoria', v)} />
-
         <div style={{ display: 'flex', gap: '4px' }}>
           {Object.entries(PRIO_META).map(([k, p]) => {
             const active = value.prioridad === k
             return (
               <button key={k} onClick={() => setField('prioridad', k)} style={{
-                display: 'flex', alignItems: 'center', gap: '4px',
-                padding: '4px 10px', borderRadius: '20px',
-                border:      `1px solid ${active ? p.color : 'var(--border)'}`,
-                background:  active ? p.bg : 'none',
-                color:       active ? p.color : 'var(--text2)',
-                fontSize: '11px', fontWeight: active ? 600 : 400,
-                fontFamily: 'Inter, sans-serif', cursor: 'pointer', transition: 'all .1s',
+                display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '20px',
+                border: `1px solid ${active ? p.color : 'var(--border)'}`,
+                background: active ? p.bg : 'none', color: active ? p.color : 'var(--text2)',
+                fontSize: '11px', fontWeight: active ? 600 : 400, fontFamily: 'Inter, sans-serif', cursor: 'pointer', transition: 'all .1s',
               }}>
                 <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: p.color, flexShrink: 0 }} />
                 {p.label}
@@ -875,66 +1001,32 @@ function TareaForm({ value, setField, onSave, onCancel, saving, mode }) {
         </div>
       </div>
 
-      {/* ── Fila 2: alcance + fecha + acciones ── */}
+      {/* Alcance + fecha + acciones */}
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-        {/* Alcance */}
         <div style={{ display: 'flex', gap: '4px' }}>
           {ALCANCES.map(a => {
             const active = value.alcance === a.key
             return (
               <button key={a.key} onClick={() => setField('alcance', a.key)} style={{
                 padding: '4px 9px', borderRadius: '20px',
-                border:     `1px solid ${active ? a.color : 'var(--border)'}`,
-                background: active ? a.bg : 'none',
-                color:      active ? a.color : 'var(--text2)',
-                fontSize: '11px', fontWeight: active ? 600 : 400,
-                fontFamily: 'Inter, sans-serif', cursor: 'pointer', transition: 'all .1s',
+                border: `1px solid ${active ? a.color : 'var(--border)'}`,
+                background: active ? a.bg : 'none', color: active ? a.color : 'var(--text2)',
+                fontSize: '11px', fontWeight: active ? 600 : 400, fontFamily: 'Inter, sans-serif', cursor: 'pointer', transition: 'all .1s',
               }}>
                 {a.label.replace('Tareas ', '')}
               </button>
             )
           })}
         </div>
-
-        {/* Fecha */}
-        <input
-          type="date"
-          value={value.fecha}
-          onChange={e => setField('fecha', e.target.value)}
-          style={{
-            background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '20px',
-            color: value.fecha ? 'var(--text0)' : 'var(--text2)',
-            fontSize: '11px', padding: '4px 10px', cursor: 'pointer', outline: 'none',
-            fontFamily: 'Inter, sans-serif',
-          }}
-        />
-
-        {/* Acciones */}
+        <input type="date" value={value.fecha} onChange={e => setField('fecha', e.target.value)}
+          style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '20px', color: value.fecha ? 'var(--text0)' : 'var(--text2)', fontSize: '11px', padding: '4px 10px', cursor: 'pointer', outline: 'none', fontFamily: 'Inter, sans-serif' }} />
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
-          <button onClick={onCancel}
-            className="btn-secondary"
-            style={{
-              padding: '6px 14px', borderRadius: '7px',
-              border: '1px solid var(--border)', background: 'none',
-              color: 'var(--text1)', fontSize: '12px', fontWeight: 500,
-              fontFamily: 'Inter, sans-serif', cursor: 'pointer', transition: 'all .18s ease',
-            }}
-          >
+          <button onClick={onCancel} className="btn-secondary"
+            style={{ padding: '6px 14px', borderRadius: '7px', border: '1px solid var(--border)', background: 'none', color: 'var(--text1)', fontSize: '12px', fontWeight: 500, fontFamily: 'Inter, sans-serif', cursor: 'pointer', transition: 'all .18s ease' }}>
             Cancelar
           </button>
-          <button
-            onClick={onSave}
-            disabled={!canSave}
-            className="btn-primary"
-            style={{
-              padding: '6px 18px', borderRadius: '7px', border: 'none',
-              background: canSave ? 'var(--accent)' : 'var(--bg3)',
-              color:      canSave ? '#1a1608' : 'var(--text2)',
-              fontSize: '12px', fontWeight: 600, fontFamily: 'Inter, sans-serif',
-              cursor: canSave ? 'pointer' : 'not-allowed',
-              opacity: saving ? .7 : 1, transition: 'all .2s ease',
-            }}
-          >
+          <button onClick={onSave} disabled={!canSave} className="btn-primary"
+            style={{ padding: '6px 18px', borderRadius: '7px', border: 'none', background: canSave ? 'var(--accent)' : 'var(--bg3)', color: canSave ? '#1a1608' : 'var(--text2)', fontSize: '12px', fontWeight: 600, fontFamily: 'Inter, sans-serif', cursor: canSave ? 'pointer' : 'not-allowed', opacity: saving ? .7 : 1, transition: 'all .2s ease' }}>
             {saving ? 'Guardando...' : mode === 'edit' ? 'Guardar cambios' : 'Agregar'}
           </button>
         </div>
@@ -948,16 +1040,151 @@ function TareaForm({ value, setField, onSave, onCancel, saving, mode }) {
 function CatSelect({ value, onChange }) {
   const c = CAT_META[value] || CAT_META.academico
   return (
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      style={{
-        padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-        border: `1px solid ${c.border}`, background: c.bg, color: c.color,
-        cursor: 'pointer', outline: 'none', fontFamily: 'Inter, sans-serif',
-      }}
-    >
+    <select value={value} onChange={e => onChange(e.target.value)}
+      style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, border: `1px solid ${c.border}`, background: c.bg, color: c.color, cursor: 'pointer', outline: 'none', fontFamily: 'Inter, sans-serif' }}>
       {CATS.map(cat => <option key={cat} value={cat}>{CAT_META[cat]?.label || cat}</option>)}
     </select>
+  )
+}
+
+// ── Gestor de etiquetas ────────────────────────────────────────────────────────
+
+function LabelManager({ labels, onSave, onClose }) {
+  const [newName, setNewName]   = useState('')
+  const [newColor, setNewColor] = useState(LABEL_COLORS[4])
+
+  function addLabel() {
+    if (!newName.trim()) return
+    const updated = [...labels, { id: 'lbl_' + Date.now(), name: newName.trim(), color: newColor }]
+    onSave(updated)
+    setNewName('')
+  }
+
+  function deleteLabel(id) {
+    onSave(labels.filter(l => l.id !== id))
+  }
+
+  function updateLabel(id, changes) {
+    onSave(labels.map(l => l.id === id ? { ...l, ...changes } : l))
+  }
+
+  return (
+    <div style={{
+      background: 'var(--bg3)', border: '1px solid var(--accent-border)',
+      borderRadius: 'var(--radius)', padding: '14px 16px',
+      marginBottom: '16px',
+      boxShadow: '0 4px 16px -4px rgba(0,0,0,.35)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+        <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text0)' }}>Gestionar etiquetas</span>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', display: 'flex', alignItems: 'center', padding: '2px' }}
+          onMouseEnter={e => e.currentTarget.style.color = 'var(--text1)'}
+          onMouseLeave={e => e.currentTarget.style.color = 'var(--text2)'}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Lista de etiquetas existentes */}
+      {labels.length === 0 && (
+        <p style={{ fontSize: '11px', color: 'var(--text2)', marginBottom: '10px' }}>Sin etiquetas aún — creá una abajo.</p>
+      )}
+      {labels.map(lbl => (
+        <LabelRow key={lbl.id} label={lbl}
+          onDelete={() => deleteLabel(lbl.id)}
+          onUpdate={ch => updateLabel(lbl.id, ch)} />
+      ))}
+
+      {/* Crear nueva etiqueta */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: labels.length > 0 ? '8px' : '0', paddingTop: labels.length > 0 ? '10px' : '0', borderTop: labels.length > 0 ? '1px solid var(--border)' : 'none' }}>
+        {/* Paleta de color */}
+        <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
+          {LABEL_COLORS.map(c => (
+            <button key={c} onClick={() => setNewColor(c)} style={{
+              width: '16px', height: '16px', borderRadius: '50%', background: c, border: 'none', cursor: 'pointer', flexShrink: 0,
+              outline: newColor === c ? `2px solid ${c}` : 'none',
+              outlineOffset: '2px',
+              transition: 'outline .1s',
+            }} />
+          ))}
+        </div>
+        <input value={newName} onChange={e => setNewName(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && addLabel()}
+          placeholder="Nombre de etiqueta..."
+          style={{ flex: 1, background: 'none', border: 'none', borderBottom: '1px solid var(--border)', outline: 'none', fontSize: '12px', color: 'var(--text1)', fontFamily: 'Inter, sans-serif', padding: '3px 0' }} />
+        <button onClick={addLabel} disabled={!newName.trim()}
+          style={{ padding: '4px 12px', borderRadius: '7px', border: 'none', background: newName.trim() ? 'var(--accent)' : 'var(--bg3)', color: newName.trim() ? '#1a1608' : 'var(--text2)', fontSize: '11px', fontWeight: 600, cursor: newName.trim() ? 'pointer' : 'not-allowed', fontFamily: 'Inter, sans-serif', flexShrink: 0 }}>
+          Crear
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Fila de etiqueta en el gestor ──────────────────────────────────────────────
+
+function LabelRow({ label, onDelete, onUpdate }) {
+  const [hov, setHov]         = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [name, setName]       = useState(label.name)
+  const [showPalette, setShowPalette] = useState(false)
+
+  function commitRename() {
+    const trimmed = name.trim()
+    if (trimmed && trimmed !== label.name) onUpdate({ name: trimmed })
+    else setName(label.name)
+    setEditing(false)
+  }
+
+  return (
+    <div onMouseEnter={() => setHov(true)} onMouseLeave={() => { setHov(false); setShowPalette(false) }}
+      style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
+      {/* Color dot → abre paleta */}
+      <button onClick={() => setShowPalette(v => !v)}
+        style={{ width: '14px', height: '14px', borderRadius: '50%', background: label.color, border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'transform .1s' }}
+        title="Cambiar color"
+        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.25)'}
+        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+      />
+      {showPalette && (
+        <div style={{
+          position: 'absolute', top: '22px', left: 0, zIndex: 20,
+          background: 'var(--bg1)', border: '1px solid var(--border)',
+          borderRadius: '8px', padding: '7px', display: 'flex', gap: '4px', flexWrap: 'wrap', width: '118px',
+          boxShadow: '0 4px 12px rgba(0,0,0,.3)',
+        }}>
+          {LABEL_COLORS.map(c => (
+            <button key={c} onClick={() => { onUpdate({ color: c }); setShowPalette(false) }}
+              style={{ width: '18px', height: '18px', borderRadius: '50%', background: c, border: 'none', cursor: 'pointer', outline: label.color === c ? `2px solid ${c}` : 'none', outlineOffset: '2px' }} />
+          ))}
+        </div>
+      )}
+
+      {/* Nombre */}
+      {editing ? (
+        <input value={name} autoFocus onChange={e => setName(e.target.value)}
+          onBlur={commitRename}
+          onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') { setName(label.name); setEditing(false) } }}
+          style={{ flex: 1, background: 'none', border: 'none', borderBottom: '1px solid var(--accent)', outline: 'none', fontSize: '12px', color: 'var(--text1)', fontFamily: 'Inter, sans-serif' }} />
+      ) : (
+        <span onDoubleClick={() => setEditing(true)} title="Doble clic para renombrar"
+          style={{ flex: 1, fontSize: '12px', color: 'var(--text1)', cursor: 'text', userSelect: 'none' }}>
+          {label.name}
+        </span>
+      )}
+
+      {/* Eliminar */}
+      {hov && !editing && (
+        <button onClick={onDelete}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', padding: '2px', borderRadius: '4px', display: 'flex', alignItems: 'center', flexShrink: 0, transition: 'color .1s' }}
+          onMouseEnter={e => e.currentTarget.style.color = '#f07272'}
+          onMouseLeave={e => e.currentTarget.style.color = 'var(--text2)'}>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      )}
+    </div>
   )
 }
