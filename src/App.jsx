@@ -17,11 +17,31 @@ import NotifPrompt    from './components/NotifPrompt'
 import IntroAnimation from './components/IntroAnimation'
 import LoadingScreen  from './components/LoadingScreen'
 
-// ── Constantes de pantallas ───────────────────────────────────────────────────
+// ── Constantes ────────────────────────────────────────────────────────────────
 const SCREENS       = ['left', 'center', 'right']
 const SCREEN_LABELS = ['Dashboard & Tareas', 'Diario', 'Calendario']
+const SCREEN_SHORT  = ['Dashboard', 'Diario', 'Calendario']
 
-// ── Botón de acción rápida para el asistente embebido ─────────────────────────
+// ── Separador dorado entre secciones ─────────────────────────────────────────
+function SectionDivider({ label }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '6px 24px 22px' }}>
+      <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(224,189,107,.28))' }} />
+      {label && (
+        <span style={{
+          fontSize: '9px', fontWeight: 700, color: 'var(--text2)',
+          letterSpacing: '1.8px', textTransform: 'uppercase',
+          padding: '0 4px', whiteSpace: 'nowrap',
+        }}>
+          {label}
+        </span>
+      )}
+      <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(224,189,107,.28), transparent)' }} />
+    </div>
+  )
+}
+
+// ── Acción rápida del asistente embebido ─────────────────────────────────────
 function QuickBar({ chat }) {
   const [hov, setHov] = useState(false)
   const dis = chat.loading
@@ -33,8 +53,8 @@ function QuickBar({ chat }) {
         onMouseEnter={() => setHov(true)}
         onMouseLeave={() => setHov(false)}
         style={{
-          display: 'flex', alignItems: 'center', gap: '6px',
-          padding: '4px 12px', borderRadius: '20px',
+          display: 'flex', alignItems: 'center', gap: '5px',
+          padding: '3px 10px', borderRadius: '20px',
           border: `1px solid ${hov && !dis ? 'var(--accent)' : 'var(--accent-border)'}`,
           background: hov && !dis ? 'var(--accent)' : 'var(--accent-dim)',
           color: hov && !dis ? '#1a1608' : 'var(--accent)',
@@ -43,7 +63,7 @@ function QuickBar({ chat }) {
           opacity: dis ? .5 : 1, transition: 'all .15s',
         }}
       >
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
         </svg>
         ¿Qué hago primero?
@@ -52,24 +72,39 @@ function QuickBar({ chat }) {
   )
 }
 
-// ── Asistente embebido en la pantalla central ─────────────────────────────────
+// ── Asistente embebido ─────────────────────────────────────────────────────────
 function EmbeddedAsistente({ uid }) {
   const chat = useChat(uid)
   return (
-    <div style={{ padding: '0 24px 24px' }}>
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+    <div style={{ padding: '0 24px 8px' }}>
+      <div style={{
+        borderRadius: 'var(--radius)',
+        border: '1px solid var(--border)',
+        overflow: 'hidden',
+        boxShadow: '0 16px 40px -12px rgba(0,0,0,.75), 0 0 0 1px rgba(224,189,107,.07), 0 0 32px -10px rgba(224,189,107,.1)',
+        background: 'var(--bg1)',
+      }}>
+        {/* Línea de acento dorado */}
+        <div style={{
+          height: '2px',
+          background: 'linear-gradient(90deg, transparent 0%, var(--accent) 40%, var(--accent) 60%, transparent 100%)',
+          opacity: .7,
+        }} />
+        {/* Header */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: '8px',
-          padding: '13px 18px 11px',
+          padding: '11px 16px 10px',
           borderBottom: '1px solid var(--border)',
+          background: 'linear-gradient(180deg, var(--bg3) 0%, var(--bg2) 100%)',
         }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
           </svg>
           <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text0)' }}>Asistente IA</span>
-          <span style={{ fontSize: '11px', color: 'var(--text2)' }}>· datos en tiempo real</span>
+          <span style={{ fontSize: '10px', color: 'var(--text2)', marginLeft: '2px' }}>· tiempo real</span>
         </div>
-        <div style={{ height: '440px', display: 'flex', flexDirection: 'column' }}>
+        {/* Chat */}
+        <div style={{ height: '400px', display: 'flex', flexDirection: 'column', background: 'var(--bg0)' }}>
           <ChatUI {...chat} compact extraToolbar={<QuickBar chat={chat} />} />
         </div>
       </div>
@@ -77,9 +112,10 @@ function EmbeddedAsistente({ uid }) {
   )
 }
 
-// ── Accesos rápidos: PAES, Próximamente, Mapa, Diccionario ───────────────────
-function BigBtn({ label, sub, icon, onClick, disabled }) {
+// ── Botones de acceso rápido ──────────────────────────────────────────────────
+function BigBtn({ label, sub, icon, onClick, disabled, accent }) {
   const [hov, setHov] = useState(false)
+  const active = hov && !disabled
   return (
     <button
       onClick={disabled ? undefined : onClick}
@@ -89,23 +125,40 @@ function BigBtn({ label, sub, icon, onClick, disabled }) {
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
         padding: '22px 16px', borderRadius: 'var(--radius)',
-        border: `1px solid ${hov ? 'var(--accent-border)' : 'var(--border)'}`,
-        background: hov
-          ? 'linear-gradient(160deg, var(--bg3) 0%, var(--bg2) 100%)'
-          : 'var(--bg2)',
-        color: disabled ? 'var(--text2)' : hov ? 'var(--accent)' : 'var(--text0)',
+        border: `1px solid ${active
+          ? 'var(--accent)'
+          : accent && !disabled
+            ? 'rgba(224,189,107,.35)'
+            : 'var(--border)'}`,
+        background: active
+          ? 'linear-gradient(160deg, var(--bg3) 0%, rgba(224,189,107,.06) 100%)'
+          : accent && !disabled
+            ? 'linear-gradient(160deg, var(--bg3) 0%, rgba(224,189,107,.03) 100%)'
+            : 'var(--bg2)',
+        color: disabled ? 'var(--text2)' : active ? 'var(--accent)' : 'var(--text0)',
         cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? .5 : 1,
-        transition: 'all .18s ease',
+        opacity: disabled ? .42 : 1,
+        transition: 'all .2s ease',
         fontFamily: 'Inter, sans-serif',
-        boxShadow: hov
-          ? '0 0 0 1px var(--accent-border), 0 0 20px -6px rgba(224,189,107,.2), var(--shadow-sm)'
-          : 'var(--shadow-sm)',
-        transform: hov ? 'translateY(-2px)' : 'none',
+        boxShadow: active
+          ? '0 0 0 1px var(--accent-border), 0 10px 30px -8px rgba(224,189,107,.25), 0 4px 12px rgba(0,0,0,.4)'
+          : accent && !disabled
+            ? '0 0 0 1px rgba(224,189,107,.1), 0 6px 20px -8px rgba(0,0,0,.55), 0 0 16px rgba(224,189,107,.06)'
+            : '0 2px 8px rgba(0,0,0,.2)',
+        transform: active ? 'translateY(-3px)' : 'none',
         width: '100%',
+        position: 'relative', overflow: 'hidden',
       }}
     >
-      <div style={{ color: disabled ? 'var(--text2)' : hov ? 'var(--accent)' : 'var(--text1)' }}>
+      {/* Top accent line for accent buttons */}
+      {accent && !disabled && (
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: '1.5px',
+          background: 'linear-gradient(90deg, transparent, var(--accent), transparent)',
+          opacity: active ? .9 : .5,
+        }} />
+      )}
+      <div style={{ color: disabled ? 'var(--text2)' : active ? 'var(--accent)' : accent ? 'var(--accent)' : 'var(--text1)' }}>
         {icon}
       </div>
       <div style={{ textAlign: 'center' }}>
@@ -132,6 +185,7 @@ function SmallBtn({ label, icon, onClick }) {
         cursor: 'pointer', transition: 'all .15s ease',
         fontFamily: 'Inter, sans-serif', fontSize: '12px', fontWeight: 500,
         textAlign: 'left', width: '100%',
+        boxShadow: hov ? '0 0 0 1px var(--accent-border)' : 'none',
       }}
     >
       {icon}
@@ -147,8 +201,9 @@ function QuickLaunchers({ onOpen }) {
         <BigBtn
           label="PAES"
           sub="Ejercicios y ensayos"
+          accent
           icon={
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10"/>
               <circle cx="12" cy="12" r="6"/>
               <circle cx="12" cy="12" r="2"/>
@@ -160,7 +215,7 @@ function QuickLaunchers({ onOpen }) {
           label="Próximamente"
           sub="En construcción"
           icon={
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10"/>
               <line x1="12" y1="8" x2="12" y2="12"/>
               <line x1="12" y1="16" x2="12.01" y2="16"/>
@@ -195,7 +250,7 @@ function QuickLaunchers({ onOpen }) {
   )
 }
 
-// ── Panel superpuesto para PAES / Mapa / Diccionario ─────────────────────────
+// ── Overlay: PAES / Mapa / Diccionario ────────────────────────────────────────
 const OVERLAY_META = {
   paes:    { label: 'PAES' },
   diagram: { label: 'Mapa del sistema' },
@@ -214,6 +269,7 @@ function OverlayPanel({ overlay, onClose, uid, onInfo }) {
         height: '48px', display: 'flex', alignItems: 'center', gap: '12px',
         padding: '0 14px', borderBottom: '1px solid var(--border)',
         background: 'var(--bg1)', flexShrink: 0,
+        boxShadow: '0 1px 0 rgba(224,189,107,.08)',
       }}>
         <button
           onClick={onClose}
@@ -254,34 +310,19 @@ function TopBar({ user, theme, onThemeToggle, onLogout, screenIdx }) {
     <div className="topbar">
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         <img src="/logo.png" alt="SMGV" style={{ width: '22px', height: '22px', objectFit: 'contain' }} />
-        <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text0)', letterSpacing: '.2px' }}>
-          SMGV
-        </span>
-        <span style={{ fontSize: '11px', color: 'var(--text2)' }}>
-          · {SCREEN_LABELS[screenIdx]}
-        </span>
+        <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text0)', letterSpacing: '.2px' }}>SMGV</span>
+        <span style={{ fontSize: '11px', color: 'var(--text2)' }}>· {SCREEN_LABELS[screenIdx]}</span>
       </div>
-
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-        {/* Avatar */}
-        <div
-          title={user.displayName || user.email}
-          style={{
-            width: '26px', height: '26px', borderRadius: '7px',
-            background: 'var(--accent)', color: '#1a1608',
-            fontSize: '10px', fontWeight: 700,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
+        <div title={user.displayName || user.email} style={{
+          width: '26px', height: '26px', borderRadius: '7px',
+          background: 'var(--accent)', color: '#1a1608',
+          fontSize: '10px', fontWeight: 700,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
           {initials}
         </div>
-
-        {/* Tema */}
-        <button
-          onClick={onThemeToggle}
-          title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
-          className="topbar-icon-btn"
-        >
+        <button onClick={onThemeToggle} title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'} className="topbar-icon-btn">
           {theme === 'dark'
             ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
@@ -292,13 +333,7 @@ function TopBar({ user, theme, onThemeToggle, onLogout, screenIdx }) {
               </svg>
           }
         </button>
-
-        {/* Cerrar sesión */}
-        <button
-          onClick={onLogout}
-          title="Cerrar sesión"
-          className="topbar-icon-btn topbar-icon-btn--danger"
-        >
+        <button onClick={onLogout} title="Cerrar sesión" className="topbar-icon-btn topbar-icon-btn--danger">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
             <polyline points="16 17 21 12 16 7"/>
@@ -310,7 +345,7 @@ function TopBar({ user, theme, onThemeToggle, onLogout, screenIdx }) {
   )
 }
 
-// ── Toast informativo ─────────────────────────────────────────────────────────
+// ── Toast ─────────────────────────────────────────────────────────────────────
 function InfoToast({ msg, onDone }) {
   useEffect(() => {
     const t = setTimeout(onDone, 2800)
@@ -359,9 +394,7 @@ export default function App() {
     if (next >= 0 && next < SCREENS.length) setScreen(SCREENS[next])
   }
 
-  function onTouchStart(e) {
-    touchStartX.current = e.targetTouches[0].clientX
-  }
+  function onTouchStart(e) { touchStartX.current = e.targetTouches[0].clientX }
   function onTouchEnd(e) {
     if (touchStartX.current === null) return
     const delta = e.changedTouches[0].clientX - touchStartX.current
@@ -376,38 +409,38 @@ export default function App() {
     <>
       <IntroAnimation user={user} />
 
-      {/* Barra superior */}
       <TopBar
-        user={user}
-        theme={theme}
+        user={user} theme={theme}
         onThemeToggle={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
         onLogout={() => signOut(auth)}
         screenIdx={screenIdx}
       />
 
-      {/* Carrusel de 3 pantallas */}
+      {/* Carrusel */}
       <div className="carousel-viewport" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-        <div
-          className="carousel-track"
-          style={{ transform: `translateX(${-screenIdx * 33.333}%)` }}
-        >
+        <div className="carousel-track" style={{ transform: `translateX(${-screenIdx * 33.333}%)` }}>
+
           {/* IZQUIERDA: Dashboard + Tareas */}
           <div className="carousel-panel">
             <DashboardTab uid={user.uid} user={user} onInfo={setInfo} />
-            <div style={{ height: '1px', background: 'var(--border)', margin: '4px 24px 0' }} />
+            <SectionDivider label="Tareas" />
             <TareasTab uid={user.uid} />
           </div>
 
           {/* CENTRO: Diario + Asistente + Accesos */}
           <div className="carousel-panel">
-            <InicioTab
-              uid={user.uid}
-              gcalToken={gcalToken}
-              onGcalExpired={onGcalExpired}
-              onTabChange={t => { if (t === 'tareas') setScreen('left') }}
-            />
-            <EmbeddedAsistente uid={user.uid} />
-            <QuickLaunchers onOpen={setOverlay} />
+            <div className="center-panel-wrap">
+              <InicioTab
+                uid={user.uid}
+                gcalToken={gcalToken}
+                onGcalExpired={onGcalExpired}
+                onTabChange={t => { if (t === 'tareas') setScreen('left') }}
+              />
+              <SectionDivider label="Asistente IA" />
+              <EmbeddedAsistente uid={user.uid} />
+              <SectionDivider label="Accesos" />
+              <QuickLaunchers onOpen={setOverlay} />
+            </div>
           </div>
 
           {/* DERECHA: Calendario */}
@@ -422,31 +455,25 @@ export default function App() {
         </div>
       </div>
 
-      {/* Flechas de navegación */}
+      {/* Flechas de navegación — píldoras con label */}
       {screenIdx > 0 && (
-        <button
-          className="screen-arrow screen-arrow--left"
-          onClick={() => navigate(-1)}
-          title={SCREEN_LABELS[screenIdx - 1]}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <button className="screen-arrow screen-arrow--left" onClick={() => navigate(-1)}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M15 18l-6-6 6-6" />
           </svg>
+          <span className="screen-arrow-label">{SCREEN_SHORT[screenIdx - 1]}</span>
         </button>
       )}
       {screenIdx < 2 && (
-        <button
-          className="screen-arrow screen-arrow--right"
-          onClick={() => navigate(1)}
-          title={SCREEN_LABELS[screenIdx + 1]}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <button className="screen-arrow screen-arrow--right" onClick={() => navigate(1)}>
+          <span className="screen-arrow-label">{SCREEN_SHORT[screenIdx + 1]}</span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 18l6-6-6-6" />
           </svg>
         </button>
       )}
 
-      {/* Indicador de posición (3 puntos) */}
+      {/* Indicador de posición */}
       <div className="dots-indicator">
         {SCREENS.map((s, i) => (
           <button
@@ -458,21 +485,11 @@ export default function App() {
         ))}
       </div>
 
-      {/* Panel superpuesto (PAES / Mapa / Diccionario) */}
-      <OverlayPanel
-        overlay={overlay}
-        onClose={() => setOverlay(null)}
-        uid={user.uid}
-        onInfo={setInfo}
-      />
+      {/* Overlay */}
+      <OverlayPanel overlay={overlay} onClose={() => setOverlay(null)} uid={user.uid} onInfo={setInfo} />
 
-      {/* Chat flotante */}
       <FloatingChat uid={user.uid} />
-
-      {/* Notificaciones */}
       <NotifPrompt uid={user.uid} />
-
-      {/* Toast */}
       {info && <InfoToast key={info} msg={info} onDone={() => setInfo('')} />}
     </>
   )

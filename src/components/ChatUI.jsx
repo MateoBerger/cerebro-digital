@@ -115,20 +115,23 @@ export default function ChatUI({ uiMessages, input, setInput, send, loading, han
 
       {/* Input area */}
       <div style={{
-        padding: compact ? '8px 12px 12px' : '8px 28px 24px',
+        padding: compact ? '6px 10px 10px' : '8px 28px 24px',
         borderTop: '1px solid var(--border)',
         flexShrink: 0,
+        background: compact ? 'var(--bg1)' : undefined,
       }}>
         {extraToolbar && (
-          <div style={{ marginBottom: 8 }}>{extraToolbar}</div>
+          <div style={{ marginBottom: compact ? 5 : 8 }}>{extraToolbar}</div>
         )}
-        <div style={{
-          display: 'flex', gap: '8px', alignItems: 'flex-end',
-          background: 'var(--bg2)', borderRadius: '12px',
-          border: '1px solid var(--border)',
-          padding: '8px 8px 8px 14px',
-          transition: 'border-color .15s',
-        }}>
+        <div
+          className="chat-input-wrap"
+          style={{
+            display: 'flex', gap: compact ? '5px' : '8px', alignItems: 'flex-end',
+            background: 'var(--bg2)', borderRadius: compact ? '18px' : '12px',
+            border: '1px solid var(--border)',
+            padding: compact ? '5px 5px 5px 11px' : '8px 8px 8px 14px',
+          }}
+        >
           <textarea
             ref={textareaRef}
             value={input}
@@ -138,29 +141,39 @@ export default function ChatUI({ uiMessages, input, setInput, send, loading, han
             rows={1}
             style={{
               flex: 1, background: 'none', border: 'none', outline: 'none',
-              resize: 'none', fontFamily: 'inherit', fontSize: `${fs}px`,
+              resize: 'none', fontFamily: 'inherit', fontSize: compact ? '12px' : '14px',
               color: 'var(--text0)', lineHeight: 1.5,
-              maxHeight: '120px', overflowY: 'auto',
+              maxHeight: compact ? '80px' : '120px', overflowY: 'auto',
             }}
           />
-          <button
-            onClick={send}
-            disabled={!(canSend !== undefined ? canSend : input.trim()) || loading}
-            style={{
-              width: '32px', height: '32px', borderRadius: '8px', border: 'none',
-              background: (canSend !== undefined ? canSend : input.trim()) && !loading ? 'var(--accent)' : 'var(--bg3)',
-              cursor: (canSend !== undefined ? canSend : input.trim()) && !loading ? 'pointer' : 'default',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0, transition: 'background .15s',
-            }}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
-              stroke={(canSend !== undefined ? canSend : input.trim()) && !loading ? '#fff' : 'var(--text2)'}
-              strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="22" y1="2" x2="11" y2="13" />
-              <polygon points="22 2 15 22 11 13 2 9 22 2" />
-            </svg>
-          </button>
+          {(() => {
+            const canGo = (canSend !== undefined ? canSend : input.trim()) && !loading
+            const btnSz = compact ? 26 : 32
+            const iconSz = compact ? 13 : 15
+            return (
+              <button
+                onClick={send}
+                disabled={!canGo}
+                style={{
+                  width: btnSz, height: btnSz,
+                  borderRadius: compact ? '10px' : '8px',
+                  border: 'none',
+                  background: canGo ? 'var(--accent)' : 'var(--bg3)',
+                  cursor: canGo ? 'pointer' : 'default',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0, transition: 'background .15s',
+                  boxShadow: canGo ? '0 2px 8px rgba(224,189,107,.3)' : 'none',
+                }}
+              >
+                <svg width={iconSz} height={iconSz} viewBox="0 0 24 24" fill="none"
+                  stroke={canGo ? (compact ? '#1a1608' : '#fff') : 'var(--text2)'}
+                  strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                </svg>
+              </button>
+            )
+          })()}
         </div>
         {!compact && (
           <p style={{ fontSize: '11px', color: 'var(--text2)', marginTop: '6px', textAlign: 'center' }}>
