@@ -42,32 +42,33 @@ export default function AsistenteTab({ uid }) {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Header con avatar pulsante */}
+      {/* Header centrado */}
       <div style={{
-        padding: '14px 28px',
+        padding: '16px 28px 14px',
         borderBottom: '1px solid var(--border)',
         flexShrink: 0,
-        display: 'flex', alignItems: 'center', gap: '14px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
         background: 'var(--bg1)',
       }}>
-        <AssistantAvatar pulsing={chat.loading} size={40} />
-        <div>
+        <AssistantAvatar pulsing={chat.loading} size={44} />
+        <div style={{ textAlign: 'center' }}>
           <h1 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text0)', letterSpacing: '-.01em' }}>
             Asistente
           </h1>
           <p style={{ fontSize: '11px', color: 'var(--text2)', marginTop: '2px' }}>
             Acceso completo a tareas, calendario y progreso PAES · Datos en tiempo real
           </p>
+          {chat.loading && (
+            <span style={{
+              display: 'block', marginTop: '5px',
+              fontSize: '10px', color: 'var(--accent)',
+              fontWeight: 600, letterSpacing: '.8px', textTransform: 'uppercase',
+              animation: 'fadeIn .2s ease',
+            }}>
+              Pensando…
+            </span>
+          )}
         </div>
-        {chat.loading && (
-          <span style={{
-            marginLeft: 'auto', fontSize: '10px', color: 'var(--accent)',
-            fontWeight: 600, letterSpacing: '.8px', textTransform: 'uppercase',
-            animation: 'fadeIn .2s ease',
-          }}>
-            Pensando…
-          </span>
-        )}
       </div>
 
       <div style={{ flex: 1, overflow: 'hidden' }}>

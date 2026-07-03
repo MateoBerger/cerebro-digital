@@ -349,45 +349,50 @@ export default function ChatUI({
       {/* ── Área de mensajes ── */}
       <div
         className="chat-messages-bg"
-        style={{
-          flex: 1, overflowY: 'auto',
-          padding: compact ? '10px 10px 6px' : '20px 24px 12px',
-          display: 'flex', flexDirection: 'column', gap: '8px',
-        }}
+        style={{ flex: 1, overflowY: 'auto', padding: compact ? '10px 10px 6px' : '20px 20px 12px' }}
       >
-        {/* Bienvenida — solo cuando no hay mensajes y no es compact */}
-        {!hasMessages && !loading && !compact && (
-          <WelcomeState greetingData={greetingData} />
-        )}
-
-        {renderMessages()}
-        {loading && <TypingIndicator />}
-        <div ref={bottomRef} />
+        {/* Wrapper centrado para modo completo */}
+        <div style={{
+          maxWidth: compact ? undefined : '700px',
+          margin: '0 auto', width: '100%',
+          display: 'flex', flexDirection: 'column', gap: '8px',
+          minHeight: '100%',
+        }}>
+          {!hasMessages && !loading && !compact && (
+            <WelcomeState greetingData={greetingData} />
+          )}
+          {renderMessages()}
+          {loading && <TypingIndicator />}
+          <div ref={bottomRef} />
+        </div>
       </div>
 
       {/* ── Input ── */}
       <div style={{
-        padding: compact ? '6px 10px 10px' : '8px 24px 20px',
+        padding: compact ? '6px 10px 10px' : '8px 20px 20px',
         borderTop: '1px solid var(--border)',
         flexShrink: 0,
         background: compact ? 'var(--bg1)' : undefined,
       }}>
-        {extraToolbar && (
-          <div style={{ marginBottom: compact ? 5 : 8 }}>{extraToolbar}</div>
-        )}
+        {/* Wrapper centrado para modo completo */}
+        <div style={{ maxWidth: compact ? undefined : '700px', margin: '0 auto' }}>
+          {extraToolbar && (
+            <div style={{ marginBottom: compact ? 5 : 8 }}>{extraToolbar}</div>
+          )}
 
-        {/* Chips de sugerencias */}
-        {showChips && (
-          <div style={{
-            display: 'flex', flexWrap: 'wrap', gap: '5px',
-            marginBottom: compact ? 6 : 10,
-            animation: 'fadeIn .35s ease',
-          }}>
-            {QUICK_CHIPS.map(chip => (
-              <ChipBtn key={chip} label={chip} onClick={() => send(chip)} />
-            ))}
-          </div>
-        )}
+          {/* Chips de sugerencias */}
+          {showChips && (
+            <div style={{
+              display: 'flex', flexWrap: 'wrap', gap: '5px',
+              justifyContent: compact ? undefined : 'center',
+              marginBottom: compact ? 6 : 10,
+              animation: 'fadeIn .35s ease',
+            }}>
+              {QUICK_CHIPS.map(chip => (
+                <ChipBtn key={chip} label={chip} onClick={() => send(chip)} />
+              ))}
+            </div>
+          )}
 
         {/* Campo de texto con micro-avatar */}
         <div
@@ -455,11 +460,12 @@ export default function ChatUI({
           })()}
         </div>
 
-        {!compact && (
-          <p style={{ fontSize: '11px', color: 'var(--text2)', marginTop: '6px', textAlign: 'center' }}>
-            Enter para enviar · Shift+Enter para nueva línea
-          </p>
-        )}
+          {!compact && (
+            <p style={{ fontSize: '11px', color: 'var(--text2)', marginTop: '6px', textAlign: 'center' }}>
+              Enter para enviar · Shift+Enter para nueva línea
+            </p>
+          )}
+        </div>{/* /centering wrapper */}
       </div>
     </div>
   )
