@@ -16,6 +16,7 @@ function Icon({ paths, size = 18, strokeWidth = 1.75 }) {
 
 const ICONS = {
   home:       ['M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z', 'M9 22V12h6v10'],
+  diary:      ['M4 2h12a2 2 0 012 2v16a2 2 0 01-2 2H4a2 2 0 01-2-2V4a2 2 0 012-2z', 'M8 7h8M8 11h8M8 15h5'],
   dashboard:  ['M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z'],
   tasks:      ['M9 11l3 3L22 4', 'M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11'],
   calendar:   ['M8 2v4M16 2v4M3 10h18', 'M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z'],
@@ -31,7 +32,7 @@ const ICONS = {
 }
 
 const NAV_MAIN = [
-  { id: 'inicio',     label: 'Inicio',      icon: 'home' },
+  { id: 'inicio',     label: 'Diario',      icon: 'diary' },
   { id: 'dashboard',  label: 'Dashboard',   icon: 'dashboard' },
   { id: 'tareas',     label: 'Tareas',       icon: 'tasks' },
   { id: 'calendario', label: 'Calendario',  icon: 'calendar' },

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { saveCheckin, subscribeCheckin } from '../firebase/db'
+import { saveCheckin, subscribeCheckin, subscribeTareas } from '../firebase/db'
 import { gcalListarEventos } from '../utils/gcalApi'
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
 function chileDate() {
   return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))
@@ -11,18 +13,7 @@ function getLocalDate() {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
-const TODAY     = getLocalDate()
-const IS_SUNDAY = chileDate().getDay() === 0
-
-const SECCIONES = [
-  { nombre: 'Inicio',           desc: 'Esta pantalla. Check-in diario y guía de la app.' },
-  { nombre: 'Dashboard',        desc: 'Resumen de tu horario base, metas semanales y config Pomodoro.' },
-  { nombre: 'Tareas',           desc: 'Lista de tareas por categoría con prioridades y fechas. (Próximamente)' },
-  { nombre: 'Calendario',       desc: 'Vista semanal con bloques de estudio y tiempo libre. (Próximamente)' },
-  { nombre: 'PAES',             desc: 'Progreso por materia, ensayos, puntaje meta y estadísticas. (Próximamente)' },
-  { nombre: 'Mapa del sistema', desc: 'Diagrama visual de todos los módulos del SMGV, editable.' },
-  { nombre: 'Diccionario',      desc: 'Variables de configuración de toda la app, editables en tiempo real.' },
-]
+const TODAY = getLocalDate()
 
 const SLIDER_FIELDS = [
   { key: 'ganas_estudio',    label: 'Ganas de estudiar' },
@@ -39,43 +30,60 @@ const TIEMPO_OPTIONS = [
 
 const DEFAULT_VALUES = { ganas_estudio: 5, energia: 5, ganas_productivo: 5, animo: 5, tiempo_libre: 'algo' }
 
+const TIPO_COLOR = {
+  clase: '#5b9cf6', estudio: '#c084fc', paes: '#3ec97e',
+  libre: '#9e99ba', ejercicio: '#f0a740', otro: '#625e7c',
+}
+
+const PRIO_META = {
+  alta:  { color: '#f07272' },
+  media: { color: '#f0a740' },
+  baja:  { color: '#625e7c' },
+}
+
 function sliderColor(v) {
   if (v <= 3) return 'var(--red)'
   if (v <= 6) return 'var(--amber)'
   return 'var(--green)'
 }
 
-export default function InicioTab({ uid, gcalToken, onGcalExpired }) {
-  const [fields, setFields]     = useState(DEFAULT_VALUES)
-  const [saved, setSaved]       = useState(undefined) // undefined=cargando, null=no hay, obj=existe
-  const [editing, setEditing]   = useState(false)
-  const [saving, setSaving]     = useState(false)
-  const [eventosHoy, setEvHoy]  = useState(null)   // null=no cargado, []=sin eventos
+// ── Componente principal ───────────────────────────────────────────────────────
 
-  // Cargar eventos de Google Calendar para hoy
+export default function InicioTab({ uid, gcalToken, onGcalExpired, onTabChange }) {
+  const [fields, setFields]    = useState(DEFAULT_VALUES)
+  const [saved, setSaved]      = useState(undefined)
+  const [editing, setEditing]  = useState(false)
+  const [saving, setSaving]    = useState(false)
+  const [eventosHoy, setEvHoy] = useState(null)
+  const [tareas, setTareas]    = useState([])
+
+  // Eventos GCal de hoy
   useEffect(() => {
     if (!gcalToken) return
     const start = new Date(); start.setHours(0, 0, 0, 0)
     const end   = new Date(); end.setHours(23, 59, 59, 999)
     gcalListarEventos(gcalToken, start, end)
       .then(items => {
-        const ev = items
-          .filter(e => e.start?.dateTime)
-          .map(e => ({
-            id:         e.id,
-            titulo:     e.summary || '(sin título)',
-            horaInicio: new Date(e.start.dateTime).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }),
-            horaFin:    new Date(e.end.dateTime).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }),
-            tipo:       e.extendedProperties?.private?.tipo || 'otro',
-          }))
-        setEvHoy(ev)
+        setEvHoy(
+          items
+            .filter(e => e.start?.dateTime)
+            .sort((a, b) => new Date(a.start.dateTime) - new Date(b.start.dateTime))
+            .map(e => ({
+              id:         e.id,
+              titulo:     e.summary || '(sin título)',
+              horaInicio: new Date(e.start.dateTime).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }),
+              horaFin:    new Date(e.end.dateTime).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }),
+              tipo:       e.extendedProperties?.private?.tipo || 'otro',
+            }))
+        )
       })
       .catch(err => { if (err.code === 'token_expired') onGcalExpired?.(); setEvHoy([]) })
   }, [gcalToken])
 
+  // Check-in de hoy
   useEffect(() => {
     if (!uid) return
-    const unsub = subscribeCheckin(uid, TODAY, data => {
+    return subscribeCheckin(uid, TODAY, data => {
       setSaved(data || null)
       if (data) setFields({
         ganas_estudio:    data.ganas_estudio    ?? 5,
@@ -85,7 +93,12 @@ export default function InicioTab({ uid, gcalToken, onGcalExpired }) {
         tiempo_libre:     data.tiempo_libre     ?? 'algo',
       })
     })
-    return unsub
+  }, [uid])
+
+  // Tareas
+  useEffect(() => {
+    if (!uid) return
+    return subscribeTareas(uid, setTareas)
   }, [uid])
 
   async function handleSave() {
@@ -97,119 +110,84 @@ export default function InicioTab({ uid, gcalToken, onGcalExpired }) {
 
   function setField(key, val) { setFields(f => ({ ...f, [key]: val })) }
 
-  const dateStr  = new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })
-  const showForm = saved === null || editing
+  // Saludo por hora
+  const now = chileDate()
+  const h   = now.getHours()
+  const greeting = h < 6 ? 'Buenas noches' : h < 12 ? 'Buenos días' : h < 20 ? 'Buenas tardes' : 'Buenas noches'
+  const dateLabel = now.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })
+  const dateCap   = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)
+
+  const showForm  = saved === null || editing
+  const urgentes  = tareas.filter(t => !t.completada && t.fecha && t.fecha <= TODAY)
+  const vencidas  = urgentes.filter(t => t.fecha < TODAY)
+  const hoy       = urgentes.filter(t => t.fecha === TODAY)
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
-      {/* Marca de agua: logo de fondo */}
+      {/* Marca de agua */}
       <img
         src="/cerebro-logo.png"
         alt=""
         aria-hidden="true"
         className="inicio-watermark"
         style={{
-          position: 'absolute',
-          right: '6%',
-          top: '50%',
+          position: 'absolute', right: '6%', top: '50%',
           transform: 'translateY(-50%)',
-          width: '420px',
-          height: '420px',
-          objectFit: 'contain',
-          pointerEvents: 'none',
-          zIndex: 0,
+          width: '420px', height: '420px',
+          objectFit: 'contain', pointerEvents: 'none', zIndex: 0,
         }}
       />
+
       <div style={{ position: 'relative', zIndex: 1, padding: '32px 36px' }}>
-      <div style={{ maxWidth: '680px' }}>
+        <div style={{ maxWidth: '680px' }}>
 
-        {/* Header */}
-        <div style={{ marginBottom: '28px' }}>
-          <h1 style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text0)', letterSpacing: '-.5px', marginBottom: '4px' }}>
-            SMGV
-          </h1>
-          <p style={{ color: 'var(--text1)', fontSize: '14px' }}>Sistema Maestro de Gestión de Vida</p>
-        </div>
+          {/* 1 ── Saludo + fecha */}
+          <div style={{ marginBottom: '28px' }}>
+            <h1 style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text0)', letterSpacing: '-.5px', marginBottom: '4px' }}>
+              {greeting}, Mateo.
+            </h1>
+            <p style={{ color: 'var(--text2)', fontSize: '14px' }}>{dateCap}</p>
+          </div>
 
-        {/* Check semanal — solo domingos */}
-        {IS_SUNDAY && <CheckSemanalBanner />}
+          <div className="stagger-children" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-        {/* Calendario del día */}
-        {eventosHoy !== null && <CalendarioDia eventos={eventosHoy} />}
-
-        <div className="stagger-children">
-        {/* Descripción estática */}
-        <div className="card" style={{ marginBottom: '20px' }}>
-          <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text0)', marginBottom: '12px' }}>¿Qué es SMGV?</h2>
-          <p style={{ fontSize: '13px', color: 'var(--text1)', lineHeight: 1.75, marginBottom: '18px' }}>
-            Tu sistema personal para organizarte como estudiante de 4to medio. Centraliza
-            tu horario, metas, plan de estudio PAES y seguimiento diario en un solo lugar.
-            El asistente IA puede leer todo esto y ayudarte a decidir qué hacer.
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
-            {SECCIONES.map(s => (
-              <div key={s.nombre} style={{ display: 'flex', gap: '12px', alignItems: 'baseline' }}>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', minWidth: '128px', flexShrink: 0 }}>
-                  {s.nombre}
-                </span>
-                <span style={{ fontSize: '12px', color: 'var(--text1)', lineHeight: 1.5 }}>{s.desc}</span>
+            {/* 2 ── Check-in diario */}
+            <div className="card">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '18px' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
+                </svg>
+                <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text0)' }}>Check-in del día</h2>
               </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Check-in diario */}
-        <div className="card">
-          <div style={{ marginBottom: '20px' }}>
-            <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text0)', marginBottom: '4px' }}>
-              Check-in diario
-            </h2>
-            <p style={{ fontSize: '12px', color: 'var(--text2)', textTransform: 'capitalize' }}>{dateStr}</p>
-          </div>
+              {saved === undefined && (
+                <p style={{ color: 'var(--text2)', fontSize: '13px' }}>Cargando...</p>
+              )}
+              {saved !== undefined && !showForm && saved && (
+                <CheckinSummary data={saved} onEdit={() => setEditing(true)} />
+              )}
+              {saved !== undefined && showForm && (
+                <CheckinForm
+                  fields={fields}
+                  onField={setField}
+                  onSave={handleSave}
+                  saving={saving}
+                  isEdit={!!saved}
+                  onCancel={saved ? () => setEditing(false) : null}
+                />
+              )}
+            </div>
 
-          {saved === undefined && (
-            <p style={{ color: 'var(--text2)', fontSize: '13px' }}>Cargando...</p>
-          )}
+            {/* 3 ── Calendario de hoy */}
+            <CalendarioDiaCard gcalToken={gcalToken} eventosHoy={eventosHoy} />
 
-          {saved !== undefined && !showForm && saved && (
-            <CheckinSummary data={saved} onEdit={() => setEditing(true)} />
-          )}
-
-          {saved !== undefined && showForm && (
-            <CheckinForm
-              fields={fields}
-              onField={setField}
-              onSave={handleSave}
-              saving={saving}
-              isEdit={!!saved}
-              onCancel={saved ? () => setEditing(false) : null}
+            {/* 4 ── Tareas urgentes de hoy */}
+            <TareasUrgentesCard
+              vencidas={vencidas}
+              hoy={hoy}
+              onClick={() => onTabChange?.('tareas')}
             />
-          )}
-        </div>
-        </div>{/* /stagger-children */}
 
-      </div>
-      </div>
-    </div>
-  )
-}
-
-/* ── Banner check semanal (solo domingos) ── */
-function CheckSemanalBanner() {
-  return (
-    <div className="card" style={{
-      marginBottom: '20px',
-      border: '1px solid rgba(240,167,64,.35)',
-      background: 'rgba(240,167,64,.07)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <span style={{ fontSize: '22px', flexShrink: 0 }}>📋</span>
-        <div>
-          <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--amber)', marginBottom: '3px' }}>
-            Heyy, toca el check de la semana
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--text1)', lineHeight: 1.5 }}>
-            Revisá tus metas antes de que empiece la semana nueva.
           </div>
         </div>
       </div>
@@ -217,166 +195,53 @@ function CheckSemanalBanner() {
   )
 }
 
-/* ── Resumen cuando ya hay check-in ── */
-function CheckinSummary({ data, onEdit }) {
-  const tiempoLabel = { poco: 'Poco', algo: 'Algo', bastante: 'Bastante' }
+// ── Calendario de hoy (maneja los 3 estados: sin GCal, cargando, con eventos) ──
+
+function CalendarioDiaCard({ gcalToken, eventosHoy }) {
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', padding: '10px 12px', background: 'rgba(62,201,126,.08)', borderRadius: '7px', border: '1px solid rgba(62,201,126,.2)' }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M20 6L9 17l-5-5" />
-        </svg>
-        <span style={{ fontSize: '13px', color: 'var(--green)', fontWeight: 500 }}>Check-in completado hoy</span>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', marginBottom: '18px' }}>
-        {SLIDER_FIELDS.map(f => (
-          <div key={f.key}>
-            <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: '5px' }}>
-              {f.label}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '3px' }}>
-              <span style={{ fontSize: '22px', fontWeight: 700, color: sliderColor(data[f.key] ?? 5), fontFamily: "'IBM Plex Mono', monospace", lineHeight: 1 }}>
-                {data[f.key] ?? '—'}
-              </span>
-              <span style={{ fontSize: '11px', color: 'var(--text2)', fontWeight: 400 }}>/10</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '14px', borderTop: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '12px', color: 'var(--text2)' }}>Tiempo libre:</span>
-          <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text1)' }}>
-            {tiempoLabel[data.tiempo_libre] || '—'}
-          </span>
-        </div>
-        <button
-          onClick={onEdit}
-          className="btn-secondary"
-          style={{
-            padding: '5px 16px', background: 'none', border: '1px solid var(--border)',
-            borderRadius: '6px', color: 'var(--text1)', fontSize: '12px', fontWeight: 500,
-            fontFamily: 'Inter, sans-serif', cursor: 'pointer', transition: 'all .18s ease',
-          }}
-        >
-          Editar
-        </button>
-      </div>
-    </div>
-  )
-}
-
-/* ── Formulario de check-in ── */
-function CheckinForm({ fields, onField, onSave, saving, isEdit, onCancel }) {
-  return (
-    <div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '22px', marginBottom: '26px' }}>
-        {SLIDER_FIELDS.map(f => (
-          <SliderRow
-            key={f.key}
-            label={f.label}
-            value={fields[f.key] ?? 5}
-            onChange={v => onField(f.key, v)}
-          />
-        ))}
-      </div>
-
-      {/* Tiempo libre */}
-      <div style={{ marginBottom: '28px' }}>
-        <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text0)', display: 'block', marginBottom: '10px' }}>
-          ¿Cuánto tiempo libre tenés hoy?
-        </label>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {TIEMPO_OPTIONS.map(opt => {
-            const active = fields.tiempo_libre === opt.value
-            return (
-              <button
-                key={opt.value}
-                onClick={() => onField('tiempo_libre', opt.value)}
-                style={{
-                  padding: '7px 20px', borderRadius: '7px',
-                  border: `1.5px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-                  background: active ? 'var(--accent-dim)' : 'none',
-                  color: active ? 'var(--accent)' : 'var(--text1)',
-                  fontFamily: 'Inter, sans-serif', fontSize: '13px',
-                  fontWeight: active ? 500 : 400,
-                  cursor: 'pointer', transition: 'all .12s',
-                }}
-              >
-                {opt.label}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Acciones */}
-      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-        {onCancel && (
-          <button
-            onClick={onCancel}
-            className="btn-secondary"
-            style={{
-              padding: '9px 20px', background: 'none', border: '1px solid var(--border)',
-              borderRadius: '7px', color: 'var(--text1)', fontFamily: 'Inter, sans-serif',
-              fontSize: '13px', cursor: 'pointer', transition: 'all .18s ease',
-            }}
-          >
-            Cancelar
-          </button>
-        )}
-        <button
-          onClick={onSave}
-          disabled={saving}
-          className="btn-primary"
-          style={{
-            padding: '9px 24px',
-            background: saving ? 'var(--bg3)' : 'var(--accent)',
-            border: 'none', borderRadius: '7px',
-            color: saving ? 'var(--text2)' : '#1a1608',
-            fontFamily: 'Inter, sans-serif', fontSize: '13px', fontWeight: 600,
-            cursor: saving ? 'not-allowed' : 'pointer',
-            opacity: saving ? .7 : 1, transition: 'all .2s ease',
-          }}
-        >
-          {saving ? 'Guardando...' : isEdit ? 'Actualizar' : 'Guardar check-in'}
-        </button>
-      </div>
-    </div>
-  )
-}
-
-/* ── Calendario del día ── */
-const TIPO_COLOR = {
-  clase:     '#5b9cf6', estudio: '#c084fc', paes: '#3ec97e',
-  libre:     '#9e99ba', ejercicio: '#f0a740', otro: '#625e7c',
-}
-
-function CalendarioDia({ eventos }) {
-  const dateStr = new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })
-
-  return (
-    <div className="card" style={{ marginBottom: '20px' }}>
+    <div className="card">
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="4" width="18" height="18" rx="2"/>
           <path d="M16 2v4M8 2v4M3 10h18"/>
         </svg>
         <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text0)' }}>Hoy en tu calendario</h2>
-        <span style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--text2)', textTransform: 'capitalize' }}>
-          {dateStr}
-        </span>
       </div>
 
-      {eventos.length === 0 ? (
-        <p style={{ fontSize: '13px', color: 'var(--text2)', textAlign: 'center', padding: '10px 0' }}>
-          Sin eventos programados para hoy
+      {/* Sin GCal conectado */}
+      {!gcalToken && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '10px',
+          padding: '10px 12px', borderRadius: '8px',
+          background: 'var(--bg3)', border: '1px solid var(--border)',
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <span style={{ fontSize: '12px', color: 'var(--text2)' }}>
+            Conectá Google Calendar desde la pestaña <strong style={{ color: 'var(--text1)' }}>Calendario</strong> para ver tus eventos aquí.
+          </span>
+        </div>
+      )}
+
+      {/* Cargando */}
+      {gcalToken && eventosHoy === null && (
+        <p style={{ fontSize: '12px', color: 'var(--text2)', padding: '6px 0' }}>Cargando eventos...</p>
+      )}
+
+      {/* Sin eventos */}
+      {gcalToken && eventosHoy !== null && eventosHoy.length === 0 && (
+        <p style={{ fontSize: '12px', color: 'var(--text2)', textAlign: 'center', padding: '10px 0' }}>
+          Sin eventos programados para hoy — día libre.
         </p>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {eventos.map(ev => {
+      )}
+
+      {/* Lista de eventos */}
+      {gcalToken && eventosHoy !== null && eventosHoy.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          {eventosHoy.map(ev => {
             const color = TIPO_COLOR[ev.tipo] || TIPO_COLOR.otro
             return (
               <div key={ev.id} style={{
@@ -387,7 +252,7 @@ function CalendarioDia({ eventos }) {
               }}>
                 <span style={{
                   fontSize: '11px', fontFamily: "'IBM Plex Mono', monospace",
-                  color: 'var(--text2)', whiteSpace: 'nowrap', minWidth: '90px',
+                  color: 'var(--text2)', whiteSpace: 'nowrap', minWidth: '96px', flexShrink: 0,
                 }}>
                   {ev.horaInicio} – {ev.horaFin}
                 </span>
@@ -406,7 +271,237 @@ function CalendarioDia({ eventos }) {
   )
 }
 
-/* ── Fila de slider ── */
+// ── Tareas urgentes de hoy ─────────────────────────────────────────────────────
+
+function TareasUrgentesCard({ vencidas, hoy, onClick }) {
+  const total    = vencidas.length + hoy.length
+  const hasUrgent = total > 0
+  const MAX_SHOW  = 5
+  const combined  = [...vencidas, ...hoy].slice(0, MAX_SHOW)
+  const remaining = total - combined.length
+
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: '100%', textAlign: 'left', background: 'none', border: 'none',
+        padding: 0, cursor: onClick ? 'pointer' : 'default',
+      }}
+    >
+      <div
+        className="card"
+        style={{
+          border: hasUrgent && vencidas.length > 0
+            ? '1px solid rgba(240,114,114,.3)'
+            : hasUrgent
+              ? '1px solid rgba(240,167,64,.28)'
+              : undefined,
+          background: hasUrgent && vencidas.length > 0
+            ? 'rgba(240,114,114,.04)'
+            : undefined,
+          transition: 'border-color .15s, box-shadow .15s',
+        }}
+        onMouseEnter={e => { if (onClick) e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,.18)' }}
+        onMouseLeave={e => { if (onClick) e.currentTarget.style.boxShadow = '' }}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: hasUrgent ? '12px' : '0' }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke={vencidas.length > 0 ? '#f07272' : hoy.length > 0 ? '#f0a740' : 'var(--accent)'}
+            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+          <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text0)', flex: 1 }}>
+            Tareas urgentes de hoy
+          </h2>
+          {hasUrgent && (
+            <span style={{
+              fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
+              background: vencidas.length > 0 ? 'rgba(240,114,114,.12)' : 'rgba(240,167,64,.12)',
+              color:      vencidas.length > 0 ? '#f07272' : '#f0a740',
+              border:     `1px solid ${vencidas.length > 0 ? 'rgba(240,114,114,.3)' : 'rgba(240,167,64,.3)'}`,
+            }}>
+              {total}
+            </span>
+          )}
+          {onClick && (
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          )}
+        </div>
+
+        {/* Sin urgentes */}
+        {!hasUrgent && (
+          <p style={{ fontSize: '12px', color: 'var(--text2)', marginTop: '8px' }}>
+            Sin tareas urgentes para hoy. ¡Bien!
+          </p>
+        )}
+
+        {/* Lista compacta */}
+        {hasUrgent && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {combined.map(t => {
+              const prio     = PRIO_META[t.prioridad] || PRIO_META.media
+              const isOverdue = t.fecha < TODAY
+              return (
+                <div key={t.id} style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '6px 10px', borderRadius: '7px',
+                  background: 'var(--bg2)', border: '1px solid var(--border)',
+                  borderLeft: `3px solid ${prio.color}`,
+                }}>
+                  <span style={{
+                    flex: 1, fontSize: '12px', fontWeight: 500,
+                    color: 'var(--text0)',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {t.titulo}
+                  </span>
+                  <span style={{
+                    fontSize: '10px', fontFamily: "'IBM Plex Mono', monospace",
+                    fontWeight: 700, flexShrink: 0,
+                    color: isOverdue ? '#f07272' : '#f0a740',
+                  }}>
+                    {isOverdue ? 'Vencida' : 'Hoy'}
+                  </span>
+                </div>
+              )
+            })}
+            {remaining > 0 && (
+              <p style={{ fontSize: '11px', color: 'var(--text2)', paddingLeft: '2px', marginTop: '2px' }}>
+                ...y {remaining} tarea{remaining !== 1 ? 's' : ''} más
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </button>
+  )
+}
+
+// ── Resumen de check-in ya guardado ───────────────────────────────────────────
+
+function CheckinSummary({ data, onEdit }) {
+  const tiempoLabel = { poco: 'Poco', algo: 'Algo', bastante: 'Bastante' }
+  return (
+    <div>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '18px',
+        padding: '8px 12px', background: 'rgba(62,201,126,.08)',
+        borderRadius: '7px', border: '1px solid rgba(62,201,126,.2)',
+      }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 6L9 17l-5-5" />
+        </svg>
+        <span style={{ fontSize: '12px', color: 'var(--green)', fontWeight: 500 }}>Check-in completado hoy</span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', marginBottom: '16px' }}>
+        {SLIDER_FIELDS.map(f => (
+          <div key={f.key}>
+            <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: '4px' }}>
+              {f.label}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '3px' }}>
+              <span style={{ fontSize: '20px', fontWeight: 700, color: sliderColor(data[f.key] ?? 5), fontFamily: "'IBM Plex Mono', monospace", lineHeight: 1 }}>
+                {data[f.key] ?? '—'}
+              </span>
+              <span style={{ fontSize: '10px', color: 'var(--text2)' }}>/10</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text2)' }}>Tiempo libre:</span>
+          <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text1)' }}>
+            {tiempoLabel[data.tiempo_libre] || '—'}
+          </span>
+        </div>
+        <button
+          onClick={onEdit}
+          className="btn-secondary"
+          style={{
+            padding: '4px 14px', background: 'none', border: '1px solid var(--border)',
+            borderRadius: '6px', color: 'var(--text1)', fontSize: '12px', fontWeight: 500,
+            fontFamily: 'Inter, sans-serif', cursor: 'pointer', transition: 'all .18s ease',
+          }}
+        >
+          Editar
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Formulario de check-in ────────────────────────────────────────────────────
+
+function CheckinForm({ fields, onField, onSave, saving, isEdit, onCancel }) {
+  return (
+    <div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '22px', marginBottom: '26px' }}>
+        {SLIDER_FIELDS.map(f => (
+          <SliderRow key={f.key} label={f.label} value={fields[f.key] ?? 5} onChange={v => onField(f.key, v)} />
+        ))}
+      </div>
+
+      {/* Tiempo libre */}
+      <div style={{ marginBottom: '26px' }}>
+        <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text0)', display: 'block', marginBottom: '10px' }}>
+          ¿Cuánto tiempo libre tenés hoy?
+        </label>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {TIEMPO_OPTIONS.map(opt => {
+            const active = fields.tiempo_libre === opt.value
+            return (
+              <button key={opt.value} onClick={() => onField('tiempo_libre', opt.value)} style={{
+                padding: '7px 20px', borderRadius: '7px',
+                border: `1.5px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                background: active ? 'var(--accent-dim)' : 'none',
+                color: active ? 'var(--accent)' : 'var(--text1)',
+                fontFamily: 'Inter, sans-serif', fontSize: '13px',
+                fontWeight: active ? 500 : 400,
+                cursor: 'pointer', transition: 'all .12s',
+              }}>
+                {opt.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Acciones */}
+      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+        {onCancel && (
+          <button onClick={onCancel} className="btn-secondary" style={{
+            padding: '9px 20px', background: 'none', border: '1px solid var(--border)',
+            borderRadius: '7px', color: 'var(--text1)', fontFamily: 'Inter, sans-serif',
+            fontSize: '13px', cursor: 'pointer', transition: 'all .18s ease',
+          }}>
+            Cancelar
+          </button>
+        )}
+        <button onClick={onSave} disabled={saving} className="btn-primary" style={{
+          padding: '9px 24px',
+          background: saving ? 'var(--bg3)' : 'var(--accent)',
+          border: 'none', borderRadius: '7px',
+          color: saving ? 'var(--text2)' : '#1a1608',
+          fontFamily: 'Inter, sans-serif', fontSize: '13px', fontWeight: 600,
+          cursor: saving ? 'not-allowed' : 'pointer',
+          opacity: saving ? .7 : 1, transition: 'all .2s ease',
+        }}>
+          {saving ? 'Guardando...' : isEdit ? 'Actualizar' : 'Guardar check-in'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Fila de slider ─────────────────────────────────────────────────────────────
+
 function SliderRow({ label, value, onChange }) {
   const color = sliderColor(value)
   const pct   = `${((value - 1) / 9) * 100}%`
@@ -418,14 +513,8 @@ function SliderRow({ label, value, onChange }) {
           {value}
         </span>
       </div>
-      <input
-        type="range"
-        min="1"
-        max="10"
-        value={value}
-        onChange={e => onChange(Number(e.target.value))}
-        style={{ '--slider-pct': pct, '--slider-color': color }}
-      />
+      <input type="range" min="1" max="10" value={value} onChange={e => onChange(Number(e.target.value))}
+        style={{ '--slider-pct': pct, '--slider-color': color }} />
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
         <span style={{ fontSize: '10px', color: 'var(--text2)' }}>1</span>
         <span style={{ fontSize: '10px', color: 'var(--text2)' }}>10</span>

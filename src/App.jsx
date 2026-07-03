@@ -68,7 +68,7 @@ export default function App() {
       />
       <div className="app-content">
         <div key={tab} className="tab-enter">
-          {tab === 'inicio'     && <InicioTab    uid={user.uid} gcalToken={gcalToken} onGcalExpired={onGcalExpired} />}
+          {tab === 'inicio'     && <InicioTab    uid={user.uid} gcalToken={gcalToken} onGcalExpired={onGcalExpired} onTabChange={setTab} />}
           {tab === 'dashboard'  && <DashboardTab uid={user.uid} user={user} onInfo={setInfo} />}
           {tab === 'diagram'    && <DiagramTab   uid={user.uid} onInfo={setInfo} />}
           {tab === 'dict'       && <DictTab      uid={user.uid} onInfo={setInfo} />}
