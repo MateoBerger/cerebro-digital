@@ -304,7 +304,13 @@ export default function ChatUI({
   }, [input])
 
   const hasMessages = uiMessages.length > 0
-  const showChips   = !hasMessages && !loading
+  // Chips visibles cuando no hay mensajes o cuando el último mensaje es del asistente
+  // (desaparecen mientras el usuario espera respuesta, reaparecen después)
+  const lastMsg   = uiMessages[uiMessages.length - 1]
+  const showChips = !loading && (
+    !hasMessages ||
+    (lastMsg && (lastMsg.role === 'assistant' || lastMsg.role === 'action') && !lastMsg.pending)
+  )
 
   // Renderiza los mensajes con separadores de fecha intercalados
   function renderMessages() {
