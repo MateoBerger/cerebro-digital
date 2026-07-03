@@ -803,6 +803,18 @@ input[type="range"]::-moz-range-track {
   to   { transform: scale(1); opacity: 1; }
 }
 
+/* ── Fondo de textura sutil del chat ── */
+.chat-messages-bg {
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(224,189,107,.045) 1px, transparent 0);
+  background-size: 22px 22px;
+}
+[data-theme="light"] .chat-messages-bg {
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(169,128,47,.06) 1px, transparent 0);
+  background-size: 22px 22px;
+}
+
 /* ── Chat message entrance ── */
 .msg-bubble { animation: msg-in 220ms cubic-bezier(.25,.46,.45,.94) both; }
 @keyframes msg-in {

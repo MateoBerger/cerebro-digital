@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import {
   subscribeTareas, addTarea, updateTarea,
   subscribeBloques, addBloque,
@@ -6,6 +6,7 @@ import {
   subscribeCheckin,
   subscribeDailyGoalsConfig, subscribeDailyGoalsState, addDailyGoalItem,
 } from '../firebase/db'
+import { auth } from '../firebase/config'
 import {
   gcalListarEventos,
   gcalCrearEvento,
@@ -101,18 +102,37 @@ export function useChat(uid) {
   const [goalState,  setGoalState]  = useState({})
 
   const [uiMessages, setUiMessages] = useState(() => {
-    const h = new Date().getHours()
-    const s = h < 12 ? 'Buenos días' : h < 20 ? 'Buenas tardes' : 'Buenas noches'
-    return [{
-      id:   'init',
-      role: 'assistant',
-      text: `${s}, Mateo. Tengo acceso a tus tareas, calendario y progreso PAES. ¿En qué te ayudo?`,
-    }]
+    try {
+      const raw = localStorage.getItem(`smgv_chat_${uid}`)
+      if (raw) {
+        const msgs = JSON.parse(raw)
+        const cutoff = Date.now() - 48 * 60 * 60 * 1000
+        const hist = msgs.filter(m => m.ts && m.ts > cutoff && !m.pending && m.id !== 'init')
+        if (hist.length > 0) return hist
+      }
+    } catch { /* storage disabled or parse error */ }
+    return []
   })
   const [input,   setInput]   = useState('')
   const [loading, setLoading] = useState(false)
 
   const apiMsgsRef = useRef([])
+
+  // Cuenta urgentes para el saludo dinámico
+  const urgentCount = useMemo(() => {
+    const today = getLocalDate()
+    return tareas.filter(t => !t.completada && t.fecha && t.fecha <= today).length
+  }, [tareas])
+
+  // Persistir historial 48h en localStorage (purga automática)
+  useEffect(() => {
+    if (!uid) return
+    try {
+      const cutoff = Date.now() - 48 * 60 * 60 * 1000
+      const toSave = uiMessages.filter(m => !m.pending && m.ts && m.ts > cutoff)
+      localStorage.setItem(`smgv_chat_${uid}`, JSON.stringify(toSave))
+    } catch { /* storage lleno o deshabilitado */ }
+  }, [uiMessages, uid])
 
   useEffect(() => {
     if (!uid) return
@@ -380,7 +400,7 @@ export function useChat(uid) {
     if (quickText === undefined) setInput('')
     setLoading(true)
 
-    pushUi({ id: `u-${Date.now()}`, role: 'user', text: uiText })
+    pushUi({ id: `u-${Date.now()}`, role: 'user', text: uiText, ts: Date.now() })
 
     const newApiMsgs = [...apiMsgsRef.current, { role: 'user', content: text }]
 
@@ -414,11 +434,11 @@ export function useChat(uid) {
         console.log(`[chat] ronda ${round + 1}: ${toolBlocks.length} tool_call(s) — ${toolBlocks.map(b => b.name).join(', ')}`)
 
         const textBefore = d.content.find(b => b.type === 'text')?.text
-        if (textBefore) pushUi({ id: `a-${Date.now()}`, role: 'assistant', text: textBefore })
+        if (textBefore) pushUi({ id: `a-${Date.now()}`, role: 'assistant', text: textBefore, ts: Date.now() })
 
         for (const block of toolBlocks) {
           const chipId = `chip-${block.id}`
-          pushUi({ id: chipId, role: 'action', text: toolLabel(block.name), pending: true })
+          pushUi({ id: chipId, role: 'action', text: toolLabel(block.name), pending: true, ts: Date.now() })
           let result
 
           if (block.name === 'borrar_evento_calendario') {
@@ -498,18 +518,18 @@ export function useChat(uid) {
             finalText = `Cancelé ${succeeded} de ${total} eventos. ${failed} no se pu${failed === 1 ? 'do' : 'dieron'} borrar.`
           }
         }
-        pushUi({ id: `a2-${Date.now()}`, role: 'assistant', text: finalText })
+        pushUi({ id: `a2-${Date.now()}`, role: 'assistant', text: finalText, ts: Date.now() })
       } else {
         // Texto final del modelo (del end_turn)
         finalText = d.content?.find(b => b.type === 'text')?.text || ''
-        if (finalText) pushUi({ id: `a-${Date.now()}`, role: 'assistant', text: finalText })
+        if (finalText) pushUi({ id: `a-${Date.now()}`, role: 'assistant', text: finalText, ts: Date.now() })
       }
 
       // Actualizar historial persistente con todos los intercambios del turno
       apiMsgsRef.current = [...workingMsgs, { role: 'assistant', content: finalText }]
 
     } catch (err) {
-      pushUi({ id: `err-${Date.now()}`, role: 'assistant', text: `Error: ${err.message}`, isError: true })
+      pushUi({ id: `err-${Date.now()}`, role: 'assistant', text: `Error: ${err.message}`, isError: true, ts: Date.now() })
     }
 
     setLoading(false)
@@ -523,5 +543,9 @@ export function useChat(uid) {
     uiMessages, input, setInput, send, loading, handleKey,
     sendQuick: (text, displayText) => send(text, displayText),
     buildPriorizarPrompt,
+    greetingData: {
+      firstName: auth.currentUser?.displayName?.split(' ')[0] || 'Mateo',
+      urgentCount,
+    },
   }
 }
