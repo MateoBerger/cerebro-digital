@@ -82,6 +82,22 @@ function fmtEventRange(startIso, endIso) {
   return t2 ? `${wd} ${dt} ${t1}–${t2}` : `${wd} ${dt} ${t1}`
 }
 
+// Convierte fecha YYYY-MM-DD en texto legible en español (zona Chile)
+function fmtFechaHumana(fechaStr) {
+  if (!fechaStr) return null
+  const today   = getLocalDate()
+  const chileD  = chileNow()
+  const mananaD = new Date(chileD)
+  mananaD.setDate(chileD.getDate() + 1)
+  const pad = n => String(n).padStart(2, '0')
+  const mananaStr = `${mananaD.getFullYear()}-${pad(mananaD.getMonth() + 1)}-${pad(mananaD.getDate())}`
+  const label = new Date(fechaStr + 'T12:00:00').toLocaleDateString('es-CL', { day: 'numeric', month: 'long' })
+  if (fechaStr < today)      return `VENCIDA (${label})`
+  if (fechaStr === today)    return 'vence HOY'
+  if (fechaStr === mananaStr) return 'vence mañana'
+  return `vence ${label}`
+}
+
 // Texto amigable para el chip de resultado — nunca expone IDs internos ni texto crudo
 function toolResultUiText(name, result) {
   if (name === 'listar_eventos_calendario') {
@@ -165,9 +181,7 @@ export function useChat(uid) {
     const fmt = t => {
       let s = `• [${t.prioridad}] ${t.titulo}`
       if (t.paesSubject) s += ` (${t.paesSubject})`
-      if (t.fecha && t.fecha < today)  s += ` — VENCIDA (${t.fecha})`
-      else if (t.fecha === today)       s += ` — vence HOY`
-      else if (t.fecha)                 s += ` — vence ${t.fecha}`
+      if (t.fecha) s += ` — ${fmtFechaHumana(t.fecha)}`
       return s
     }
 
@@ -212,9 +226,10 @@ export function useChat(uid) {
 
     const pendientes = tareas.filter(t => !t.completada)
     const tareasStr  = pendientes.length
-      ? pendientes.map(t =>
-          `[${t.id}] [${t.alcance || 'general'}][${t.prioridad}] ${t.titulo}${t.descripcion ? ` — ${t.descripcion}` : ''}${t.fecha ? ` (vence: ${t.fecha})` : ''}`
-        ).join('\n')
+      ? pendientes.map(t => {
+          const fechaFmt = t.fecha ? ` (${fmtFechaHumana(t.fecha)})` : ''
+          return `[${t.id}] [${t.alcance || 'general'}][${t.prioridad}] ${t.titulo}${t.descripcion ? ` — ${t.descripcion}` : ''}${fechaFmt}`
+        }).join('\n')
       : 'Sin tareas pendientes'
 
     const weekKey    = getWeekKey()
