@@ -46,7 +46,8 @@ const LABEL_COLORS = [
   '#94a3b8', '#fb923c',
 ]
 
-const DAYS_ES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+const DAYS_ES   = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+const CAL_DAYS  = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
 const RECURRENCE_TYPES = [
   { key: 'none',    label: 'Sin repetición' },
@@ -109,12 +110,8 @@ function nextRecurrenceDate(rec, currentDateStr) {
 
 function sortTareas(list, sortKey) {
   return [...list].sort((a, b) => {
-    if (sortKey === 'fecha') {
-      return (a.fecha || '9999').localeCompare(b.fecha || '9999')
-    }
-    if (sortKey === 'alpha') {
-      return (a.titulo || '').localeCompare(b.titulo || '', 'es')
-    }
+    if (sortKey === 'fecha') return (a.fecha || '9999').localeCompare(b.fecha || '9999')
+    if (sortKey === 'alpha') return (a.titulo || '').localeCompare(b.titulo || '', 'es')
     return (PRIO_META[a.prioridad]?.order ?? 1) - (PRIO_META[b.prioridad]?.order ?? 1)
   })
 }
@@ -135,6 +132,9 @@ export default function TareasTab({ uid }) {
   const [sortKey, setSortKey]         = useState(
     () => localStorage.getItem('cd-task-sort') || 'prioridad'
   )
+  const [viewMode, setViewMode]       = useState(
+    () => localStorage.getItem('cd-task-view') || 'lista'
+  )
 
   useEffect(() => {
     if (!uid) return
@@ -143,9 +143,8 @@ export default function TareasTab({ uid }) {
     return () => { u1(); u2() }
   }, [uid])
 
-  useEffect(() => {
-    localStorage.setItem('cd-task-sort', sortKey)
-  }, [sortKey])
+  useEffect(() => { localStorage.setItem('cd-task-sort', sortKey) }, [sortKey])
+  useEffect(() => { localStorage.setItem('cd-task-view', viewMode) }, [viewMode])
 
   function openNew(alcance) {
     setForm({ mode: 'new', alcance, ...EMPTY_FIELDS })
@@ -197,7 +196,6 @@ export default function TareasTab({ uid }) {
   async function handleToggle(t) {
     const nowDone = !t.completada
     await updateTarea(uid, t.id, { completada: nowDone })
-    // On completion of a recurring task → generate next instance once
     if (nowDone && t.recurrence?.type && t.recurrence.type !== 'none') {
       const nextFecha = nextRecurrenceDate(t.recurrence, t.fecha)
       if (nextFecha) {
@@ -232,6 +230,11 @@ export default function TareasTab({ uid }) {
     })
   }
 
+  function handleCalEdit(t) {
+    openEdit(t)
+    setViewMode('lista')
+  }
+
   const hasPaes  = tareas.some(t => t.paesSubject)
   const totalPen = tareas.filter(t => !t.completada).length
 
@@ -257,7 +260,7 @@ export default function TareasTab({ uid }) {
     <div style={{ flex: 1, overflowY: 'auto', padding: '26px 32px 48px' }}>
 
       {/* ── Header ── */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '14px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text0)', letterSpacing: '-.4px', marginBottom: '3px' }}>
             Tareas
@@ -288,6 +291,39 @@ export default function TareasTab({ uid }) {
         </button>
       </div>
 
+      {/* ── Toggle Lista / Calendario ── */}
+      <div style={{ marginBottom: '16px' }}>
+        <div style={{
+          display: 'inline-flex', background: 'var(--bg3)',
+          border: '1px solid var(--border)', borderRadius: '10px', padding: '2px', gap: '2px',
+        }}>
+          {[
+            { k: 'lista',      icon: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01', label: 'Lista' },
+            { k: 'calendario', icon: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z', label: 'Calendario' },
+          ].map(({ k, icon, label }) => (
+            <button
+              key={k}
+              onClick={() => setViewMode(k)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '5px',
+                padding: '5px 13px', borderRadius: '8px', border: 'none',
+                background: viewMode === k ? 'var(--bg1)' : 'none',
+                color: viewMode === k ? 'var(--text0)' : 'var(--text2)',
+                fontSize: '11px', fontWeight: viewMode === k ? 600 : 400,
+                cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                transition: 'all .15s',
+                boxShadow: viewMode === k ? '0 1px 4px rgba(0,0,0,.22)' : 'none',
+              }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d={icon} />
+              </svg>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* ── Gestor de etiquetas ── */}
       {showLblMgr && (
         <LabelManager
@@ -297,102 +333,119 @@ export default function TareasTab({ uid }) {
         />
       )}
 
-      {/* ── Barra de búsqueda + ordenar ── */}
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
-        <div style={{
-          flex: 1, display: 'flex', alignItems: 'center', gap: '7px',
-          padding: '6px 11px', borderRadius: '8px',
-          background: 'var(--bg3)', border: '1px solid var(--border)',
-        }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round">
-            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-          </svg>
-          <input
-            value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-            placeholder="Buscar tareas..."
+      {/* ── Vista Calendario ── */}
+      {viewMode === 'calendario' && (
+        <CalendarView
+          tareas={filteredTareas}
+          labels={labels}
+          onToggle={handleToggle}
+          onEdit={handleCalEdit}
+          filterPaes={filterPaes}
+          filterLabel={filterLabel}
+        />
+      )}
+
+      {/* ── Vista Lista ── */}
+      {viewMode === 'lista' && (<>
+
+        {/* Barra de búsqueda + ordenar */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
+          <div style={{
+            flex: 1, display: 'flex', alignItems: 'center', gap: '7px',
+            padding: '6px 11px', borderRadius: '8px',
+            background: 'var(--bg3)', border: '1px solid var(--border)',
+          }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round">
+              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+            </svg>
+            <input
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+              placeholder="Buscar tareas..."
+              style={{
+                flex: 1, background: 'none', border: 'none', outline: 'none',
+                fontSize: '12px', color: 'var(--text1)', fontFamily: 'Inter, sans-serif',
+              }}
+            />
+            {searchText && (
+              <button onClick={() => setSearchText('')} style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--text2)', display: 'flex', alignItems: 'center', padding: 0,
+              }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+          <select
+            value={sortKey}
+            onChange={e => setSortKey(e.target.value)}
             style={{
-              flex: 1, background: 'none', border: 'none', outline: 'none',
-              fontSize: '12px', color: 'var(--text1)', fontFamily: 'Inter, sans-serif',
+              padding: '6px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 500,
+              border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--text1)',
+              cursor: 'pointer', outline: 'none', fontFamily: 'Inter, sans-serif',
             }}
-          />
-          {searchText && (
-            <button onClick={() => setSearchText('')} style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--text2)', display: 'flex', alignItems: 'center', padding: 0,
-            }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
-            </button>
-          )}
+          >
+            {SORT_OPTIONS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+          </select>
         </div>
-        <select
-          value={sortKey}
-          onChange={e => setSortKey(e.target.value)}
-          style={{
-            padding: '6px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 500,
-            border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--text1)',
-            cursor: 'pointer', outline: 'none', fontFamily: 'Inter, sans-serif',
-          }}
-        >
-          {SORT_OPTIONS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
-        </select>
-      </div>
 
-      {/* ── Filtro materia PAES ── */}
-      {hasPaes && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
-          <span style={{ fontSize: '11px', color: 'var(--text2)', fontWeight: 500 }}>Materia:</span>
-          <FilterPill active={filterPaes === ''} color="var(--accent)" onClick={() => setFilterPaes('')}>Todas</FilterPill>
-          {PAES_SUBJECTS.map(s => (
-            <FilterPill key={s.key} active={filterPaes === s.key} color={s.color}
-              onClick={() => setFilterPaes(filterPaes === s.key ? '' : s.key)}>
-              {s.label}
-            </FilterPill>
+        {/* Filtro materia PAES */}
+        {hasPaes && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text2)', fontWeight: 500 }}>Materia:</span>
+            <FilterPill active={filterPaes === ''} color="var(--accent)" onClick={() => setFilterPaes('')}>Todas</FilterPill>
+            {PAES_SUBJECTS.map(s => (
+              <FilterPill key={s.key} active={filterPaes === s.key} color={s.color}
+                onClick={() => setFilterPaes(filterPaes === s.key ? '' : s.key)}>
+                {s.label}
+              </FilterPill>
+            ))}
+          </div>
+        )}
+
+        {/* Filtro etiquetas */}
+        {labels.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '20px' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text2)', fontWeight: 500 }}>Etiqueta:</span>
+            <FilterPill active={filterLabel === ''} color="var(--accent)" onClick={() => setFilterLabel('')}>Todas</FilterPill>
+            {labels.map(lbl => (
+              <FilterPill key={lbl.id} active={filterLabel === lbl.id} color={lbl.color}
+                onClick={() => setFilterLabel(filterLabel === lbl.id ? '' : lbl.id)}>
+                {lbl.name}
+              </FilterPill>
+            ))}
+          </div>
+        )}
+
+        {/* Tres secciones */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '36px', maxWidth: '740px' }}>
+          {ALCANCES.map(alc => (
+            <TareaSeccion
+              key={alc.key}
+              uid={uid}
+              alc={alc}
+              tareas={filteredTareas.filter(t => (t.alcance || 'general') === alc.key)}
+              labels={labels}
+              sortKey={sortKey}
+              form={form}
+              setField={setField}
+              onOpenNew={() => openNew(alc.key)}
+              onOpenEdit={openEdit}
+              onCancelForm={() => setForm(null)}
+              onSave={handleSave}
+              onToggle={handleToggle}
+              onDelete={id => deleteTarea(uid, id)}
+              onDuplicate={handleDuplicate}
+              saving={saving}
+              verComp={!!verComp[alc.key]}
+              onToggleComp={() => setVerComp(v => ({ ...v, [alc.key]: !v[alc.key] }))}
+            />
           ))}
         </div>
-      )}
 
-      {/* ── Filtro etiquetas ── */}
-      {labels.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '20px' }}>
-          <span style={{ fontSize: '11px', color: 'var(--text2)', fontWeight: 500 }}>Etiqueta:</span>
-          <FilterPill active={filterLabel === ''} color="var(--accent)" onClick={() => setFilterLabel('')}>Todas</FilterPill>
-          {labels.map(lbl => (
-            <FilterPill key={lbl.id} active={filterLabel === lbl.id} color={lbl.color}
-              onClick={() => setFilterLabel(filterLabel === lbl.id ? '' : lbl.id)}>
-              {lbl.name}
-            </FilterPill>
-          ))}
-        </div>
-      )}
-
-      {/* ── Tres secciones ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '36px', maxWidth: '740px' }}>
-        {ALCANCES.map(alc => (
-          <TareaSeccion
-            key={alc.key}
-            uid={uid}
-            alc={alc}
-            tareas={filteredTareas.filter(t => (t.alcance || 'general') === alc.key)}
-            labels={labels}
-            sortKey={sortKey}
-            form={form}
-            setField={setField}
-            onOpenNew={() => openNew(alc.key)}
-            onOpenEdit={openEdit}
-            onCancelForm={() => setForm(null)}
-            onSave={handleSave}
-            onToggle={handleToggle}
-            onDelete={id => deleteTarea(uid, id)}
-            onDuplicate={handleDuplicate}
-            saving={saving}
-            verComp={!!verComp[alc.key]}
-            onToggleComp={() => setVerComp(v => ({ ...v, [alc.key]: !v[alc.key] }))}
-          />
-        ))}
-      </div>
+      </>)}
     </div>
   )
 }
@@ -417,11 +470,363 @@ function FilterPill({ active, color, onClick, children }) {
   )
 }
 
+// ── Vista Calendario ───────────────────────────────────────────────────────────
+
+function CalendarView({ tareas, labels, onToggle, onEdit }) {
+  const today = getLocalDate()
+  const [calYear, setCalYear]       = useState(() => new Date().getFullYear())
+  const [calMonth, setCalMonth]     = useState(() => new Date().getMonth())
+  const [selectedDay, setSelectedDay] = useState(null)
+
+  function prevMonth() {
+    if (calMonth === 0) { setCalYear(y => y - 1); setCalMonth(11) }
+    else setCalMonth(m => m - 1)
+    setSelectedDay(null)
+  }
+  function nextMonth() {
+    if (calMonth === 11) { setCalYear(y => y + 1); setCalMonth(0) }
+    else setCalMonth(m => m + 1)
+    setSelectedDay(null)
+  }
+  function goToday() {
+    const d = new Date()
+    setCalYear(d.getFullYear())
+    setCalMonth(d.getMonth())
+    setSelectedDay(parseInt(today.slice(8, 10)))
+  }
+
+  // Build grid (Monday-first)
+  const firstDow     = new Date(calYear, calMonth, 1).getDay()
+  const startOffset  = (firstDow + 6) % 7  // Mon=0 … Sun=6
+  const daysInMonth  = new Date(calYear, calMonth + 1, 0).getDate()
+  const cells        = []
+  for (let i = 0; i < startOffset; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+  while (cells.length % 7 !== 0) cells.push(null)
+
+  // Index tasks by date
+  const tasksByDay = {}
+  tareas.forEach(t => {
+    if (!t.fecha) return
+    if (!tasksByDay[t.fecha]) tasksByDay[t.fecha] = []
+    tasksByDay[t.fecha].push(t)
+  })
+
+  function dateStr(day) {
+    return `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  }
+
+  function getDayLoad(day) {
+    const ds       = dateStr(day)
+    const dayTasks = tasksByDay[ds] || []
+    if (!dayTasks.length) return null
+    const pending  = dayTasks.filter(t => !t.completada)
+    const overdue  = pending.filter(() => ds < today)
+    if (pending.length === 0) return { count: dayTasks.length, color: '#3ec97e', glow: false }
+    if (overdue.length > 0)   return { count: pending.length,  color: '#f07272', glow: true  }
+    if (pending.length >= 4)  return { count: pending.length,  color: '#f0a740', glow: false }
+    return                           { count: pending.length,  color: '#e0bd6b', glow: false }
+  }
+
+  const monthLabel = new Date(calYear, calMonth, 1)
+    .toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })
+  const monthCap = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
+
+  const selDateStr = selectedDay ? dateStr(selectedDay) : null
+  const selTasks   = selDateStr ? (tasksByDay[selDateStr] || []) : []
+
+  const NavBtn = ({ onClick, children }) => {
+    const [hov, setHov] = useState(false)
+    return (
+      <button onClick={onClick} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+        style={{
+          width: '30px', height: '30px', borderRadius: '7px', border: '1px solid var(--border)',
+          background: hov ? 'var(--bg3)' : 'none', color: hov ? 'var(--text0)' : 'var(--text1)',
+          cursor: 'pointer', fontFamily: 'Inter, sans-serif', fontSize: '16px', fontWeight: 400,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .12s',
+        }}>
+        {children}
+      </button>
+    )
+  }
+
+  return (
+    <div style={{ maxWidth: '800px' }}>
+
+      {/* Nav */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+        <NavBtn onClick={prevMonth}>‹</NavBtn>
+        <NavBtn onClick={nextMonth}>›</NavBtn>
+        <span style={{ flex: 1, fontSize: '15px', fontWeight: 700, color: 'var(--text0)', letterSpacing: '-.3px' }}>
+          {monthCap}
+        </span>
+        <button onClick={goToday} style={{
+          padding: '4px 12px', borderRadius: '7px', border: '1px solid var(--border)',
+          background: 'none', color: 'var(--text1)', fontSize: '11px', fontWeight: 500,
+          cursor: 'pointer', fontFamily: 'Inter, sans-serif', transition: 'all .12s',
+        }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)' }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text1)' }}>
+          Hoy
+        </button>
+      </div>
+
+      {/* Day-of-week headers */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '3px', marginBottom: '4px' }}>
+        {CAL_DAYS.map((d, i) => (
+          <div key={d} style={{
+            textAlign: 'center', fontSize: '10px', fontWeight: 600, letterSpacing: '.5px',
+            color: (i === 5 || i === 6) ? 'var(--text2)' : 'var(--text2)',
+            padding: '4px 0',
+          }}>
+            {d.toUpperCase()}
+          </div>
+        ))}
+      </div>
+
+      {/* Days grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '3px' }}>
+        {cells.map((day, i) => {
+          if (!day) return <div key={`e${i}`} style={{ minHeight: '60px' }} />
+          const ds       = dateStr(day)
+          const isToday  = ds === today
+          const isSel    = selectedDay === day
+          const load     = getDayLoad(day)
+          const isPast   = ds < today && !isToday
+
+          return (
+            <button
+              key={day}
+              onClick={() => setSelectedDay(isSel ? null : day)}
+              style={{
+                minHeight: '60px', padding: '7px 5px 8px', borderRadius: '10px',
+                border: `2px solid ${isSel ? 'var(--accent)' : isToday ? 'rgba(224,189,107,.45)' : 'transparent'}`,
+                background: isSel
+                  ? 'var(--accent-dim)'
+                  : isToday
+                    ? 'rgba(224,189,107,.06)'
+                    : 'var(--bg3)',
+                cursor: 'pointer', display: 'flex', flexDirection: 'column',
+                alignItems: 'center', gap: '5px', fontFamily: 'Inter, sans-serif',
+                transition: 'background .12s, border-color .12s, transform .1s',
+                outline: 'none',
+              }}
+              onMouseEnter={e => { if (!isSel) { e.currentTarget.style.background = 'var(--bg2)'; e.currentTarget.style.transform = 'translateY(-1px)' } }}
+              onMouseLeave={e => { if (!isSel) { e.currentTarget.style.background = isToday ? 'rgba(224,189,107,.06)' : 'var(--bg3)'; e.currentTarget.style.transform = 'none' } }}
+            >
+              <span style={{
+                fontSize: '13px', fontWeight: isToday ? 700 : isPast ? 400 : 500,
+                color: isToday ? 'var(--accent)' : isPast ? 'var(--text2)' : 'var(--text1)',
+                lineHeight: 1,
+              }}>
+                {day}
+              </span>
+              {load && (
+                <span style={{
+                  fontSize: '11px', fontWeight: 700, lineHeight: 1.3,
+                  padding: '1px 6px', borderRadius: '10px',
+                  color: load.color,
+                  background: hexToRgba(load.color, .14),
+                  border: `1px solid ${hexToRgba(load.color, .28)}`,
+                  boxShadow: load.glow ? `0 0 7px ${hexToRgba(load.color, .35)}` : 'none',
+                }}>
+                  {load.count}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Day panel */}
+      {selectedDay && (
+        <CalDayPanel
+          dateStr={selDateStr}
+          tasks={selTasks}
+          labels={labels}
+          today={today}
+          onToggle={onToggle}
+          onEdit={onEdit}
+          onClose={() => setSelectedDay(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Panel del día seleccionado ─────────────────────────────────────────────────
+
+function CalDayPanel({ dateStr, tasks, labels, today, onToggle, onEdit, onClose }) {
+  const date    = new Date(dateStr + 'T12:00:00')
+  const title   = date.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })
+  const titleCap = title.charAt(0).toUpperCase() + title.slice(1)
+  const isOverdue = dateStr < today
+  const hasPending = tasks.some(t => !t.completada)
+  const sorted  = [...tasks].sort((a, b) =>
+    (PRIO_META[a.prioridad]?.order ?? 1) - (PRIO_META[b.prioridad]?.order ?? 1)
+  )
+
+  return (
+    <div style={{
+      marginTop: '16px', padding: '16px 18px',
+      background: 'var(--bg3)',
+      border: `1px solid ${isOverdue && hasPending ? 'rgba(240,114,114,.3)' : 'var(--accent-border)'}`,
+      borderRadius: 'var(--radius)',
+      boxShadow: '0 6px 20px -6px rgba(0,0,0,.35)',
+      animation: 'slideUp .18s cubic-bezier(.25,.46,.45,.94) both',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text0)' }}>
+            {titleCap}
+          </span>
+          {isOverdue && hasPending && (
+            <span style={{
+              fontSize: '10px', fontWeight: 700, color: '#f07272',
+              background: 'rgba(240,114,114,.1)', padding: '2px 8px', borderRadius: '20px',
+              border: '1px solid rgba(240,114,114,.25)',
+            }}>
+              Vencido
+            </span>
+          )}
+          <span style={{ fontSize: '11px', color: 'var(--text2)' }}>
+            {tasks.length === 0 ? '' : `${tasks.length} tarea${tasks.length !== 1 ? 's' : ''}`}
+          </span>
+        </div>
+        <button onClick={onClose}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', display: 'flex', alignItems: 'center', padding: '3px', borderRadius: '5px', transition: 'color .1s' }}
+          onMouseEnter={e => e.currentTarget.style.color = 'var(--text1)'}
+          onMouseLeave={e => e.currentTarget.style.color = 'var(--text2)'}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      {tasks.length === 0 ? (
+        <p style={{ fontSize: '12px', color: 'var(--text2)', fontStyle: 'italic' }}>
+          Sin tareas para este día. ¡Día libre!
+        </p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {sorted.map(t => (
+            <CalTaskRow key={t.id} tarea={t} labels={labels} onToggle={onToggle} onEdit={onEdit} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Fila compacta de tarea en el calendario ────────────────────────────────────
+
+function CalTaskRow({ tarea, labels, onToggle, onEdit }) {
+  const [hov, setHov] = useState(false)
+  const cat  = CAT_META[tarea.categoria]  || CAT_META.academico
+  const prio = PRIO_META[tarea.prioridad] || PRIO_META.media
+  const done = tarea.completada
+  const paes = PAES_SUBJECTS.find(s => s.key === tarea.paesSubject)
+  const taskLabels = (tarea.labelIds || []).map(id => labels.find(l => l.id === id)).filter(Boolean)
+
+  return (
+    <div
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
+        borderRadius: '9px',
+        borderLeft: `3px solid ${done ? 'var(--border)' : prio.color}`,
+        border: `1px solid ${hov && !done ? 'var(--accent-border)' : 'var(--border)'}`,
+        borderLeft: `3px solid ${done ? 'var(--border)' : prio.color}`,
+        background: hov ? 'var(--bg2)' : 'var(--bg1)',
+        opacity: done ? .52 : 1,
+        transition: 'all .12s',
+      }}
+    >
+      {/* Checkbox */}
+      <button
+        onClick={() => onToggle(tarea)}
+        style={{
+          width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0,
+          border: `2px solid ${done ? '#3ec97e' : 'var(--border-hi)'}`,
+          background: done ? 'rgba(62,201,126,.14)' : 'none',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', transition: 'all .15s',
+        }}
+      >
+        {done && (
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#3ec97e" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 6L9 17l-5-5" />
+          </svg>
+        )}
+      </button>
+
+      {/* Título */}
+      <span style={{
+        flex: 1, fontSize: '12px', fontFamily: 'Inter, sans-serif', minWidth: 0,
+        color: done ? 'var(--text2)' : 'var(--text0)',
+        textDecoration: done ? 'line-through' : 'none',
+        fontWeight: tarea.prioridad === 'alta' && !done ? 600 : 400,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {tarea.titulo}
+      </span>
+
+      {/* Badges */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+        <span style={{
+          fontSize: '10px', fontWeight: 600, padding: '1px 7px', borderRadius: '20px',
+          background: cat.bg, color: cat.color, border: `1px solid ${cat.border}`,
+        }}>
+          {cat.label}
+        </span>
+        {paes && (
+          <span style={{
+            fontSize: '10px', fontWeight: 700, padding: '1px 7px', borderRadius: '20px',
+            background: paes.bg, color: paes.color, border: `1px solid ${paes.border}`,
+          }}>
+            {paes.label}
+          </span>
+        )}
+        {taskLabels.map(lbl => (
+          <span key={lbl.id} style={{
+            fontSize: '10px', fontWeight: 600, padding: '1px 7px', borderRadius: '20px',
+            background: hexToRgba(lbl.color, .14), color: lbl.color,
+            border: `1px solid ${hexToRgba(lbl.color, .32)}`,
+          }}>
+            {lbl.name}
+          </span>
+        ))}
+      </div>
+
+      {/* Editar */}
+      {hov && !done && (
+        <button
+          onClick={() => onEdit(tarea)}
+          title="Editar (vuelve a la vista Lista)"
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: 'var(--text2)', display: 'flex', alignItems: 'center',
+            padding: '2px', borderRadius: '4px', flexShrink: 0, transition: 'color .1s',
+          }}
+          onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+          onMouseLeave={e => e.currentTarget.style.color = 'var(--text2)'}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+          </svg>
+        </button>
+      )}
+    </div>
+  )
+}
+
 // ── Sección ────────────────────────────────────────────────────────────────────
 
 function TareaSeccion({ uid, alc, tareas, labels, sortKey, form, setField, onOpenNew, onOpenEdit, onCancelForm, onSave, onToggle, onDelete, onDuplicate, saving, verComp, onToggleComp }) {
-  const isNewHere  = form?.mode === 'new' && form.alcance === alc.key
-  const pendientes = sortTareas(tareas.filter(t => !t.completada), sortKey)
+  const isNewHere   = form?.mode === 'new' && form.alcance === alc.key
+  const pendientes  = sortTareas(tareas.filter(t => !t.completada), sortKey)
   const completadas = tareas.filter(t => t.completada)
 
   return (
@@ -591,7 +996,6 @@ function TareaItem({ uid, tarea, labels, onToggle, onEdit, onDelete, onDuplicate
 
       {/* Contenido */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        {/* Título */}
         <span style={{
           display: 'block', fontSize: '13px', lineHeight: '1.45', fontFamily: 'Inter, sans-serif',
           color:          done ? 'var(--text2)' : 'var(--text0)',
@@ -602,7 +1006,6 @@ function TareaItem({ uid, tarea, labels, onToggle, onEdit, onDelete, onDuplicate
           {tarea.titulo}
         </span>
 
-        {/* Descripción */}
         {tarea.descripcion && (
           <p style={{
             fontSize: '12px', color: 'var(--text2)', lineHeight: 1.55,
@@ -614,7 +1017,6 @@ function TareaItem({ uid, tarea, labels, onToggle, onEdit, onDelete, onDuplicate
           </p>
         )}
 
-        {/* Subtareas: barra si hay, botón + si no */}
         {hasSubs ? (
           <button onClick={() => setShowSubs(v => !v)}
             style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', cursor: 'pointer', padding: '0', marginBottom: '8px' }}>
@@ -650,9 +1052,7 @@ function TareaItem({ uid, tarea, labels, onToggle, onEdit, onDelete, onDuplicate
 
         {showSubs && <SubtaskPanel uid={uid} tarea={tarea} />}
 
-        {/* Badges */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-          {/* Categoría */}
           <span style={{
             fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: '20px',
             background: cat.bg, color: cat.color, border: `1px solid ${cat.border}`,
@@ -661,7 +1061,6 @@ function TareaItem({ uid, tarea, labels, onToggle, onEdit, onDelete, onDuplicate
             {cat.label}
           </span>
 
-          {/* Materia PAES */}
           {paes && (
             <span style={{
               fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px',
@@ -672,12 +1071,10 @@ function TareaItem({ uid, tarea, labels, onToggle, onEdit, onDelete, onDuplicate
             </span>
           )}
 
-          {/* Etiquetas */}
           {taskLabels.map(lbl => (
             <span key={lbl.id} style={{
               fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: '20px',
-              background: hexToRgba(lbl.color, .14),
-              color: lbl.color,
+              background: hexToRgba(lbl.color, .14), color: lbl.color,
               border: `1px solid ${hexToRgba(lbl.color, .35)}`,
               letterSpacing: '.1px', flexShrink: 0,
             }}>
@@ -685,7 +1082,6 @@ function TareaItem({ uid, tarea, labels, onToggle, onEdit, onDelete, onDuplicate
             </span>
           ))}
 
-          {/* Ícono recurrencia */}
           {isRecurring && (
             <span style={{ fontSize: '11px', flexShrink: 0, lineHeight: 1 }}
               title={`Repite: ${tarea.recurrence.type === 'daily' ? 'diaria' : tarea.recurrence.type === 'weekly' ? `cada ${DAYS_ES[tarea.recurrence.dayOfWeek ?? 0]}` : 'mensual'}`}>
@@ -693,7 +1089,6 @@ function TareaItem({ uid, tarea, labels, onToggle, onEdit, onDelete, onDuplicate
             </span>
           )}
 
-          {/* Prioridad */}
           {(!done && (tarea.prioridad === 'alta' || hov)) && tarea.prioridad !== 'baja' && (
             <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px', fontWeight: 600, color: prio.color, flexShrink: 0 }}>
               <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: prio.color }} />
@@ -701,7 +1096,6 @@ function TareaItem({ uid, tarea, labels, onToggle, onEdit, onDelete, onDuplicate
             </span>
           )}
 
-          {/* Fecha */}
           {fecha && (
             <span style={{
               fontSize: '11px', fontFamily: "'IBM Plex Mono', monospace", flexShrink: 0,
@@ -712,7 +1106,6 @@ function TareaItem({ uid, tarea, labels, onToggle, onEdit, onDelete, onDuplicate
             </span>
           )}
 
-          {/* Acciones hover */}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: '3px', opacity: hov ? 1 : 0, transition: 'opacity .15s' }}>
             <IconBtn onClick={onEdit} title="Editar" hoverColor="var(--accent)" hoverBg="var(--accent-dim)">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -884,18 +1277,15 @@ function TareaForm({ value, setField, labels, onSave, onCancel, saving, mode }) 
       boxShadow: '0 8px 24px -8px rgba(0,0,0,.5), 0 0 0 1px var(--accent-border)',
       animation: 'slideUp .2s cubic-bezier(.25,.46,.45,.94) both',
     }}>
-      {/* Título */}
       <input autoFocus placeholder="Título de la tarea..." value={value.titulo}
         onChange={e => setField('titulo', e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSave() } }}
         style={{ width: '100%', background: 'none', border: 'none', outline: 'none', color: 'var(--text0)', fontSize: '14px', fontWeight: 500, fontFamily: 'Inter, sans-serif', marginBottom: '10px' }} />
 
-      {/* Descripción */}
       <textarea placeholder="Descripción (opcional)..." value={value.descripcion}
         onChange={e => setField('descripcion', e.target.value)} rows={2}
         style={{ width: '100%', background: 'none', resize: 'none', border: 'none', borderTop: '1px solid var(--border)', outline: 'none', color: 'var(--text1)', fontSize: '12px', lineHeight: 1.6, fontFamily: 'Inter, sans-serif', padding: '10px 0 12px' }} />
 
-      {/* Etiquetas (solo si hay etiquetas creadas) */}
       {labels.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px solid var(--border)' }}>
           <span style={{ fontSize: '11px', color: 'var(--text2)', fontWeight: 500, marginRight: '2px' }}>Etiquetas:</span>
@@ -916,7 +1306,6 @@ function TareaForm({ value, setField, labels, onSave, onCancel, saving, mode }) 
         </div>
       )}
 
-      {/* Materia PAES */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px solid var(--border)' }}>
         <span style={{ fontSize: '11px', color: 'var(--text2)', fontWeight: 500, marginRight: '2px' }}>Materia:</span>
         {PAES_SUBJECTS.map(s => {
@@ -937,7 +1326,6 @@ function TareaForm({ value, setField, labels, onSave, onCancel, saving, mode }) 
         )}
       </div>
 
-      {/* Repetición */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px solid var(--border)' }}>
         <span style={{ fontSize: '11px', color: 'var(--text2)', fontWeight: 500, paddingTop: '4px', whiteSpace: 'nowrap' }}>Repetición:</span>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -980,7 +1368,6 @@ function TareaForm({ value, setField, labels, onSave, onCancel, saving, mode }) 
         </div>
       </div>
 
-      {/* Categoría + prioridad */}
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '10px' }}>
         <CatSelect value={value.categoria} onChange={v => setField('categoria', v)} />
         <div style={{ display: 'flex', gap: '4px' }}>
@@ -1001,7 +1388,6 @@ function TareaForm({ value, setField, labels, onSave, onCancel, saving, mode }) 
         </div>
       </div>
 
-      {/* Alcance + fecha + acciones */}
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: '4px' }}>
           {ALCANCES.map(a => {
@@ -1055,24 +1441,14 @@ function LabelManager({ labels, onSave, onClose }) {
 
   function addLabel() {
     if (!newName.trim()) return
-    const updated = [...labels, { id: 'lbl_' + Date.now(), name: newName.trim(), color: newColor }]
-    onSave(updated)
+    onSave([...labels, { id: 'lbl_' + Date.now(), name: newName.trim(), color: newColor }])
     setNewName('')
-  }
-
-  function deleteLabel(id) {
-    onSave(labels.filter(l => l.id !== id))
-  }
-
-  function updateLabel(id, changes) {
-    onSave(labels.map(l => l.id === id ? { ...l, ...changes } : l))
   }
 
   return (
     <div style={{
       background: 'var(--bg3)', border: '1px solid var(--accent-border)',
-      borderRadius: 'var(--radius)', padding: '14px 16px',
-      marginBottom: '16px',
+      borderRadius: 'var(--radius)', padding: '14px 16px', marginBottom: '16px',
       boxShadow: '0 4px 16px -4px rgba(0,0,0,.35)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
@@ -1086,26 +1462,21 @@ function LabelManager({ labels, onSave, onClose }) {
         </button>
       </div>
 
-      {/* Lista de etiquetas existentes */}
       {labels.length === 0 && (
         <p style={{ fontSize: '11px', color: 'var(--text2)', marginBottom: '10px' }}>Sin etiquetas aún — creá una abajo.</p>
       )}
       {labels.map(lbl => (
         <LabelRow key={lbl.id} label={lbl}
-          onDelete={() => deleteLabel(lbl.id)}
-          onUpdate={ch => updateLabel(lbl.id, ch)} />
+          onDelete={() => onSave(labels.filter(l => l.id !== lbl.id))}
+          onUpdate={ch => onSave(labels.map(l => l.id === lbl.id ? { ...l, ...ch } : l))} />
       ))}
 
-      {/* Crear nueva etiqueta */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: labels.length > 0 ? '8px' : '0', paddingTop: labels.length > 0 ? '10px' : '0', borderTop: labels.length > 0 ? '1px solid var(--border)' : 'none' }}>
-        {/* Paleta de color */}
         <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
           {LABEL_COLORS.map(c => (
             <button key={c} onClick={() => setNewColor(c)} style={{
               width: '16px', height: '16px', borderRadius: '50%', background: c, border: 'none', cursor: 'pointer', flexShrink: 0,
-              outline: newColor === c ? `2px solid ${c}` : 'none',
-              outlineOffset: '2px',
-              transition: 'outline .1s',
+              outline: newColor === c ? `2px solid ${c}` : 'none', outlineOffset: '2px', transition: 'outline .1s',
             }} />
           ))}
         </div>
@@ -1140,10 +1511,8 @@ function LabelRow({ label, onDelete, onUpdate }) {
   return (
     <div onMouseEnter={() => setHov(true)} onMouseLeave={() => { setHov(false); setShowPalette(false) }}
       style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
-      {/* Color dot → abre paleta */}
       <button onClick={() => setShowPalette(v => !v)}
         style={{ width: '14px', height: '14px', borderRadius: '50%', background: label.color, border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'transform .1s' }}
-        title="Cambiar color"
         onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.25)'}
         onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
       />
@@ -1161,7 +1530,6 @@ function LabelRow({ label, onDelete, onUpdate }) {
         </div>
       )}
 
-      {/* Nombre */}
       {editing ? (
         <input value={name} autoFocus onChange={e => setName(e.target.value)}
           onBlur={commitRename}
@@ -1174,7 +1542,6 @@ function LabelRow({ label, onDelete, onUpdate }) {
         </span>
       )}
 
-      {/* Eliminar */}
       {hov && !editing && (
         <button onClick={onDelete}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', padding: '2px', borderRadius: '4px', display: 'flex', alignItems: 'center', flexShrink: 0, transition: 'color .1s' }}
