@@ -735,7 +735,6 @@ function CalTaskRow({ tarea, labels, onToggle, onEdit }) {
       style={{
         display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
         borderRadius: '9px',
-        borderLeft: `3px solid ${done ? 'var(--border)' : prio.color}`,
         border: `1px solid ${hov && !done ? 'var(--accent-border)' : 'var(--border)'}`,
         borderLeft: `3px solid ${done ? 'var(--border)' : prio.color}`,
         background: hov ? 'var(--bg2)' : 'var(--bg1)',

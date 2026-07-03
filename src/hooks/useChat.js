@@ -128,6 +128,54 @@ export function useChat(uid) {
     return () => unsubs.forEach(u => u())
   }, [uid])
 
+  function buildPriorizarPrompt() {
+    const today = getLocalDate()
+    const ctx   = buildContext()
+
+    const pendientes = tareas.filter(t => !t.completada)
+    const urgentes   = pendientes.filter(t => t.fecha && t.fecha <= today)
+    const altaPrio   = pendientes.filter(t => t.prioridad === 'alta' && (!t.fecha || t.fecha > today))
+    const diarias    = pendientes.filter(t =>
+      t.alcance === 'diaria' && !urgentes.includes(t) && !altaPrio.includes(t)
+    )
+    const resto      = pendientes.filter(t =>
+      !urgentes.includes(t) && !altaPrio.includes(t) && !diarias.includes(t)
+    )
+
+    const fmt = t => {
+      let s = `• [${t.prioridad}] ${t.titulo}`
+      if (t.paesSubject) s += ` (${t.paesSubject})`
+      if (t.fecha && t.fecha < today)  s += ` — VENCIDA (${t.fecha})`
+      else if (t.fecha === today)       s += ` — vence HOY`
+      else if (t.fecha)                 s += ` — vence ${t.fecha}`
+      return s
+    }
+
+    const parts = []
+    if (urgentes.length)           parts.push(`Urgentes / vencen hoy:\n${urgentes.map(fmt).join('\n')}`)
+    if (altaPrio.length)           parts.push(`Alta prioridad:\n${altaPrio.map(fmt).join('\n')}`)
+    if (diarias.length)            parts.push(`Tareas del día:\n${diarias.map(fmt).join('\n')}`)
+    if (resto.length && resto.length <= 5) parts.push(`Otras pendientes:\n${resto.map(fmt).join('\n')}`)
+    else if (resto.length)         parts.push(`Otras pendientes: ${resto.length} tarea(s) más`)
+
+    const tareasStr = parts.length ? parts.join('\n\n') : 'Sin tareas pendientes'
+
+    return [
+      `¿Qué hago primero hoy?`,
+      ``,
+      `Fecha: ${ctx.fecha}`,
+      `Mi estado según el check-in de hoy: ${ctx.checkin}`,
+      ``,
+      `Mi horario de hoy:`,
+      ctx.calendario,
+      ``,
+      `Mis tareas pendientes:`,
+      tareasStr,
+      ``,
+      `Con todo eso, dame un orden sugerido de qué hacer primero hoy. Ten en cuenta mi energía, mi ánimo y el tiempo libre que tengo. Sé breve, claro/a y cercano/a.`,
+    ].join('\n')
+  }
+
   function buildContext() {
     const today = new Date()
     const fecha = today.toLocaleDateString('es-CL', {
@@ -325,10 +373,10 @@ export function useChat(uid) {
     setUiMessages(m => m.map(msg => msg.id === id ? { ...msg, ...updates } : msg))
   }
 
-  async function send() {
-    if (!input.trim() || loading) return
-    const text = input.trim()
-    setInput('')
+  async function send(quickText) {
+    const text = (quickText !== undefined ? quickText : input).trim()
+    if (!text || loading) return
+    if (quickText === undefined) setInput('')
     setLoading(true)
 
     pushUi({ id: `u-${Date.now()}`, role: 'user', text })
@@ -470,5 +518,9 @@ export function useChat(uid) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
   }
 
-  return { uiMessages, input, setInput, send, loading, handleKey }
+  return {
+    uiMessages, input, setInput, send, loading, handleKey,
+    sendQuick: text => send(text),
+    buildPriorizarPrompt,
+  }
 }

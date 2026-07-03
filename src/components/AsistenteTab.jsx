@@ -2,6 +2,40 @@ import React from 'react'
 import { useChat } from '../hooks/useChat'
 import ChatUI from './ChatUI'
 
+function QuickActions({ chat }) {
+  const [hov, setHov] = React.useState(false)
+  const disabled = chat.loading
+
+  return (
+    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+      <button
+        onClick={() => !disabled && chat.sendQuick(chat.buildPriorizarPrompt())}
+        disabled={disabled}
+        onMouseEnter={() => setHov(true)}
+        onMouseLeave={() => setHov(false)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '6px',
+          padding: '5px 14px', borderRadius: '20px',
+          border: `1px solid ${hov && !disabled ? 'var(--accent)' : 'var(--accent-border)'}`,
+          background: hov && !disabled ? 'var(--accent)' : 'var(--accent-dim)',
+          color: hov && !disabled ? '#1a1608' : 'var(--accent)',
+          fontSize: '12px', fontWeight: 600,
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          fontFamily: 'Inter, sans-serif',
+          opacity: disabled ? .5 : 1,
+          transition: 'all .15s',
+          outline: 'none',
+        }}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+        </svg>
+        ¿Qué hago primero?
+      </button>
+    </div>
+  )
+}
+
 export default function AsistenteTab({ uid }) {
   const chat = useChat(uid)
 
@@ -21,7 +55,7 @@ export default function AsistenteTab({ uid }) {
       </div>
 
       <div style={{ flex: 1, overflow: 'hidden' }}>
-        <ChatUI {...chat} />
+        <ChatUI {...chat} extraToolbar={<QuickActions chat={chat} />} />
       </div>
     </div>
   )
