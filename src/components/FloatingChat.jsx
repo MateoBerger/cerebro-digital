@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useChat } from '../hooks/useChat'
 import ChatUI from './ChatUI'
+import AssistantAvatar from './AssistantAvatar'
 
 function FloatingQuickActions({ chat }) {
   const [hov, setHov] = useState(false)
@@ -101,20 +102,15 @@ export default function FloatingChat({ uid }) {
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             flexShrink: 0,
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{
-                width: '28px', height: '28px', borderRadius: '8px',
-                background: 'var(--accent-dim)', border: '1px solid var(--accent-border)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)',
-              }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-                </svg>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+              <AssistantAvatar pulsing={chat.loading} size={28} />
               <div>
                 <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text0)' }}>Asistente SMGV</div>
-                <div style={{ fontSize: '10px', color: 'var(--text2)', marginTop: '1px' }}>Datos en tiempo real</div>
+                <div style={{ fontSize: '10px', color: 'var(--text2)', marginTop: '1px' }}>
+                  {chat.loading ? (
+                    <span style={{ color: 'var(--accent)' }}>Pensando…</span>
+                  ) : 'Datos en tiempo real'}
+                </div>
               </div>
             </div>
             <button

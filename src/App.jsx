@@ -13,6 +13,7 @@ import DiagramTab     from './components/DiagramTab'
 import DictTab        from './components/DictTab'
 import ChatUI         from './components/ChatUI'
 import FloatingChat   from './components/FloatingChat'
+import AssistantAvatar from './components/AssistantAvatar'
 import NotifPrompt    from './components/NotifPrompt'
 import IntroAnimation from './components/IntroAnimation'
 import LoadingScreen  from './components/LoadingScreen'
@@ -90,18 +91,20 @@ function EmbeddedAsistente({ uid }) {
           background: 'linear-gradient(90deg, transparent 0%, var(--accent) 40%, var(--accent) 60%, transparent 100%)',
           opacity: .7,
         }} />
-        {/* Header */}
+        {/* Header con avatar */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: '8px',
-          padding: '11px 16px 10px',
+          display: 'flex', alignItems: 'center', gap: '9px',
+          padding: '10px 14px',
           borderBottom: '1px solid var(--border)',
           background: 'linear-gradient(180deg, var(--bg3) 0%, var(--bg2) 100%)',
         }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-          </svg>
+          <AssistantAvatar pulsing={chat.loading} size={24} />
           <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text0)' }}>Asistente IA</span>
-          <span style={{ fontSize: '10px', color: 'var(--text2)', marginLeft: '2px' }}>· tiempo real</span>
+          <span style={{ fontSize: '10px', color: 'var(--text2)', marginLeft: '2px' }}>
+            {chat.loading
+              ? <span style={{ color: 'var(--accent)' }}>Pensando…</span>
+              : '· tiempo real'}
+          </span>
         </div>
         {/* Chat */}
         <div style={{ height: '400px', display: 'flex', flexDirection: 'column', background: 'var(--bg0)' }}>

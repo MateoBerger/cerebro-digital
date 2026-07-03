@@ -1,6 +1,7 @@
 import React from 'react'
 import { useChat } from '../hooks/useChat'
 import ChatUI from './ChatUI'
+import AssistantAvatar from './AssistantAvatar'
 
 function QuickActions({ chat }) {
   const [hov, setHov] = React.useState(false)
@@ -41,17 +42,32 @@ export default function AsistenteTab({ uid }) {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Header con avatar pulsante */}
       <div style={{
-        padding: '20px 28px 16px',
+        padding: '14px 28px',
         borderBottom: '1px solid var(--border)',
         flexShrink: 0,
+        display: 'flex', alignItems: 'center', gap: '14px',
+        background: 'var(--bg1)',
       }}>
-        <h1 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text0)', letterSpacing: '-.01em' }}>
-          Asistente
-        </h1>
-        <p style={{ fontSize: '12px', color: 'var(--text2)', marginTop: '2px' }}>
-          Acceso completo a tareas, calendario y progreso PAES · Lee y modifica datos en tiempo real
-        </p>
+        <AssistantAvatar pulsing={chat.loading} size={40} />
+        <div>
+          <h1 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text0)', letterSpacing: '-.01em' }}>
+            Asistente
+          </h1>
+          <p style={{ fontSize: '11px', color: 'var(--text2)', marginTop: '2px' }}>
+            Acceso completo a tareas, calendario y progreso PAES · Datos en tiempo real
+          </p>
+        </div>
+        {chat.loading && (
+          <span style={{
+            marginLeft: 'auto', fontSize: '10px', color: 'var(--accent)',
+            fontWeight: 600, letterSpacing: '.8px', textTransform: 'uppercase',
+            animation: 'fadeIn .2s ease',
+          }}>
+            Pensando…
+          </span>
+        )}
       </div>
 
       <div style={{ flex: 1, overflow: 'hidden' }}>
