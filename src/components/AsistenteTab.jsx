@@ -9,7 +9,7 @@ function QuickActions({ chat }) {
   return (
     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
       <button
-        onClick={() => !disabled && chat.sendQuick(chat.buildPriorizarPrompt())}
+        onClick={() => !disabled && chat.sendQuick(chat.buildPriorizarPrompt(), '¿Qué hago primero?')}
         disabled={disabled}
         onMouseEnter={() => setHov(true)}
         onMouseLeave={() => setHov(false)}

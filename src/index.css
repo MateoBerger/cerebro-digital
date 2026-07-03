@@ -419,7 +419,8 @@ input[type="range"]::-moz-range-track {
 /* ── Markdown en burbujas del asistente ── */
 .chat-md p            { margin: 0 0 .45em; }
 .chat-md p:last-child { margin-bottom: 0; }
-.chat-md ul, .chat-md ol { padding-left: 1.4em; margin: .3em 0 .45em; }
+.chat-md ul { padding-left: 1.5em; margin: .3em 0 .45em; }
+.chat-md ol { padding-left: 1.8em; margin: .3em 0 .45em; }
 .chat-md li           { margin-bottom: .18em; }
 .chat-md li:last-child{ margin-bottom: 0; }
 .chat-md strong       { font-weight: 600; }

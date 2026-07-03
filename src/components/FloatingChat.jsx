@@ -2,6 +2,38 @@ import React, { useState } from 'react'
 import { useChat } from '../hooks/useChat'
 import ChatUI from './ChatUI'
 
+function FloatingQuickActions({ chat }) {
+  const [hov, setHov] = useState(false)
+  const disabled = chat.loading
+  return (
+    <div style={{ display: 'flex', gap: '5px' }}>
+      <button
+        onClick={() => !disabled && chat.sendQuick(chat.buildPriorizarPrompt(), '¿Qué hago primero?')}
+        disabled={disabled}
+        onMouseEnter={() => setHov(true)}
+        onMouseLeave={() => setHov(false)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '5px',
+          padding: '4px 11px', borderRadius: '20px',
+          border: `1px solid ${hov && !disabled ? 'var(--accent)' : 'var(--accent-border)'}`,
+          background: hov && !disabled ? 'var(--accent)' : 'var(--accent-dim)',
+          color: hov && !disabled ? '#1a1608' : 'var(--accent)',
+          fontSize: '11px', fontWeight: 600,
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          fontFamily: 'Inter, sans-serif',
+          opacity: disabled ? .5 : 1,
+          transition: 'all .15s', outline: 'none',
+        }}
+      >
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+        </svg>
+        ¿Qué hago primero?
+      </button>
+    </div>
+  )
+}
+
 export default function FloatingChat({ uid }) {
   const [open, setOpen] = useState(false)
   const chat = useChat(uid)
@@ -103,7 +135,7 @@ export default function FloatingChat({ uid }) {
 
           {/* Chat */}
           <div style={{ flex: 1, overflow: 'hidden' }}>
-            <ChatUI {...chat} compact />
+            <ChatUI {...chat} compact extraToolbar={<FloatingQuickActions chat={chat} />} />
           </div>
         </div>
       )}

@@ -373,13 +373,14 @@ export function useChat(uid) {
     setUiMessages(m => m.map(msg => msg.id === id ? { ...msg, ...updates } : msg))
   }
 
-  async function send(quickText) {
-    const text = (quickText !== undefined ? quickText : input).trim()
+  async function send(quickText, displayText) {
+    const text   = (quickText !== undefined ? quickText : input).trim()
+    const uiText = displayText || text
     if (!text || loading) return
     if (quickText === undefined) setInput('')
     setLoading(true)
 
-    pushUi({ id: `u-${Date.now()}`, role: 'user', text })
+    pushUi({ id: `u-${Date.now()}`, role: 'user', text: uiText })
 
     const newApiMsgs = [...apiMsgsRef.current, { role: 'user', content: text }]
 
@@ -520,7 +521,7 @@ export function useChat(uid) {
 
   return {
     uiMessages, input, setInput, send, loading, handleKey,
-    sendQuick: text => send(text),
+    sendQuick: (text, displayText) => send(text, displayText),
     buildPriorizarPrompt,
   }
 }
