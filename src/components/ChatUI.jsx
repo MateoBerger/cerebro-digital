@@ -72,7 +72,6 @@ function ChatMessage({ msg }) {
         fontSize: '14px', lineHeight: 1.55,
         whiteSpace:  isUser ? 'pre-wrap' : undefined,
         wordBreak:   'break-word',
-        overflow:    isUser ? undefined : 'hidden',
       }}>
         {isUser
           ? msg.text
