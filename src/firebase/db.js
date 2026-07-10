@@ -393,24 +393,33 @@ export async function addDailyGoalItem(uid, label) {
 }
 
 // ── POMODORO STATS ────────────────────────────────────────
-// users/{uid}/pomodoro-data/stats → { date, count }
+// users/{uid}/pomodoro-data/stats → { date, count, streak, lastBlockDate }
+// La racha cuenta días consecutivos con al menos un bloque completado.
 
 export function subscribePomodoroStats(uid, callback) {
   return onSnapshot(doc(db, 'users', uid, 'pomodoro-data', 'stats'), snap => {
-    callback(snap.exists() ? snap.data() : { date: null, count: 0 })
+    callback(snap.exists() ? snap.data() : { date: null, count: 0, streak: 0, lastBlockDate: null })
   })
 }
 
 export async function recordPomodoroBlock(uid, currentStats) {
-  const today = gymChileDate()
-  const count = currentStats?.date === today ? (currentStats.count || 0) + 1 : 1
+  const today     = gymChileDate()
+  const yesterday = gymChileYesterday()
+  const count     = currentStats?.date === today ? (currentStats.count || 0) + 1 : 1
+
+  let streak = currentStats?.streak || 0
+  if (currentStats?.lastBlockDate !== today) {
+    streak = currentStats?.lastBlockDate === yesterday ? streak + 1 : 1
+  }
 
   await setDoc(doc(db, 'users', uid, 'pomodoro-data', 'stats'), {
-    date:  today,
+    date:          today,
     count,
+    streak,
+    lastBlockDate: today,
   }, { merge: true })
 
-  return count
+  return { count, streak }
 }
 
 // ── TASK LABELS ───────────────────────────────────────────────────────────────

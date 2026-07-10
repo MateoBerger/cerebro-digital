@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { subscribePomodoroStats, recordPomodoroBlock } from '../firebase/db'
 import { playPhaseEndSound } from '../utils/sound'
 
@@ -19,21 +20,31 @@ const PHASE_META = {
   descanso: { label: 'Descanso largo', color: 'var(--blue)'   },
 }
 
+const MIN_BLOQUE = 5
+const MAX_BLOQUE = 180
 const RADIUS = 130
 const CIRC   = 2 * Math.PI * RADIUS
 
 // Timer de enfoque a pantalla completa. Usa la config de Pomodoro ya
 // definida en el Dashboard (bloque / descanso / micro / meta diaria).
-export default function FocusMode({ uid, bloque, descanso, micro, metaBloq, onClose }) {
-  const bloqueMin   = Math.max(1, bloque   || 25)
+// Se monta vía portal en document.body: el carrusel de 3 pantallas usa
+// transform en .carousel-track, y cualquier transform en un ancestro
+// redefine el containing block de un position:fixed — sin el portal el
+// overlay quedaba recortado/centrado dentro del track en vez de la
+// ventana real. stopPropagation en touch evita que el gesto de swipe
+// (manejado más arriba, en .carousel-viewport) siga burbujeando por el
+// árbol de React — los portales burbujean por el árbol de componentes,
+// no por el DOM, así que sin esto se podía seguir deslizando de pantalla.
+export default function FocusMode({ uid, bloque, descanso, micro, metaBloq, onChangeBloque, onClose }) {
   const descansoMin = Math.max(1, descanso || 15)
   const microMin    = Math.max(1, micro    || 5)
   const meta        = Math.max(1, metaBloq || 3)
 
-  const [pomodoroStats, setPomodoroStats] = useState({ date: null, count: 0 })
+  const [bloqueMin, setBloqueMin]   = useState(Math.max(1, bloque || 25))
+  const [pomodoroStats, setPomodoroStats] = useState({ date: null, count: 0, streak: 0 })
   const [phase, setPhase]           = useState('trabajo')
-  const [totalSec, setTotalSec]     = useState(bloqueMin * 60)
-  const [secondsLeft, setSecondsLeft] = useState(bloqueMin * 60)
+  const [totalSec, setTotalSec]     = useState(() => Math.max(1, bloque || 25) * 60)
+  const [secondsLeft, setSecondsLeft] = useState(() => Math.max(1, bloque || 25) * 60)
   const [running, setRunning]       = useState(false)
   const [banner, setBanner]         = useState(null)
 
@@ -41,6 +52,13 @@ export default function FocusMode({ uid, bloque, descanso, micro, metaBloq, onCl
     if (!uid) return
     return subscribePomodoroStats(uid, setPomodoroStats)
   }, [uid])
+
+  // Bloquea el scroll de fondo mientras el modo enfoque está montado
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prevOverflow }
+  }, [])
 
   // Cuenta regresiva
   useEffect(() => {
@@ -86,18 +104,35 @@ export default function FocusMode({ uid, bloque, descanso, micro, metaBloq, onCl
     setSecondsLeft(totalSec)
   }
 
+  function adjustBloque(delta) {
+    if (running) return
+    const next = Math.min(MAX_BLOQUE, Math.max(MIN_BLOQUE, bloqueMin + delta))
+    if (next === bloqueMin) return
+    setBloqueMin(next)
+    if (phase === 'trabajo') {
+      setTotalSec(next * 60)
+      setSecondsLeft(next * 60)
+    }
+    onChangeBloque?.(next)
+  }
+
   const blocksToday = pomodoroStats?.date === chileToday() ? (pomodoroStats.count || 0) : 0
-  const phaseMeta       = PHASE_META[phase]
+  const phaseMeta    = PHASE_META[phase]
   const fraction     = totalSec > 0 ? secondsLeft / totalSec : 0
   const dashOffset   = CIRC * (1 - fraction)
 
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 250,
-      background: 'radial-gradient(circle at 50% 40%, var(--bg2) 0%, var(--bg0) 72%)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      animation: 'slideUp .22s ease',
-    }}>
+  return createPortal(
+    <div
+      onTouchStart={e => e.stopPropagation()}
+      onTouchEnd={e => e.stopPropagation()}
+      onTouchMove={e => e.stopPropagation()}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9000,
+        background: 'radial-gradient(circle at 50% 40%, var(--bg2) 0%, var(--bg0) 72%)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        animation: 'slideUp .22s ease',
+      }}
+    >
       {/* Ruido sutil */}
       <div style={{
         position: 'absolute', inset: 0, opacity: .3, pointerEvents: 'none',
@@ -168,8 +203,34 @@ export default function FocusMode({ uid, bloque, descanso, micro, metaBloq, onCl
         </div>
       </div>
 
+      {/* Ajuste de duración del bloque — solo antes de iniciar un bloque de estudio */}
+      {phase === 'trabajo' && !running && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '22px', zIndex: 1 }}>
+          <span style={{ fontSize: '11px', color: 'var(--text2)' }}>Duración del bloque</span>
+          <button
+            onClick={() => adjustBloque(-5)}
+            style={{
+              width: '26px', height: '26px', borderRadius: '50%', border: '1px solid var(--border)',
+              background: 'var(--bg2)', color: 'var(--text1)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', lineHeight: 1,
+            }}
+          >−</button>
+          <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '13px', fontWeight: 600, color: 'var(--text0)', minWidth: '52px', textAlign: 'center' }}>
+            {bloqueMin} min
+          </span>
+          <button
+            onClick={() => adjustBloque(5)}
+            style={{
+              width: '26px', height: '26px', borderRadius: '50%', border: '1px solid var(--border)',
+              background: 'var(--bg2)', color: 'var(--text1)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', lineHeight: 1,
+            }}
+          >+</button>
+        </div>
+      )}
+
       {/* Controles */}
-      <div style={{ display: 'flex', gap: '14px', marginTop: '36px', zIndex: 1 }}>
+      <div style={{ display: 'flex', gap: '14px', marginTop: '28px', zIndex: 1 }}>
         <button
           onClick={() => setRunning(r => !r)}
           style={{
@@ -216,6 +277,7 @@ export default function FocusMode({ uid, bloque, descanso, micro, metaBloq, onCl
           {banner}
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   )
 }

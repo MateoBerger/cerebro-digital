@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
 import {
-  subscribeVariables, seedVariables, subscribeTareas, updateTarea,
+  subscribeVariables, seedVariables, subscribeTareas, updateTarea, updateVariable,
   subscribeDailyGoalsConfig, subscribeDailyGoalsState, toggleDailyGoal,
   getCheckinsWeek, subscribeGymStats, markGymSession,
   subscribeDayCompleteStreak, recordDayComplete,
+  subscribePomodoroStats,
 } from '../firebase/db'
 import SectionHeading from './SectionHeading'
 import CountUp from './CountUp'
@@ -95,6 +96,7 @@ export default function DashboardTab({ uid, user }) {
   const [showConfetti,      setShowConfetti]     = useState(false)
   const [celebrationStreak, setCelebrationStreak]= useState(0)
   const [showFocus,         setShowFocus]        = useState(false)
+  const [pomodoroStats,     setPomodoroStats]    = useState({ date: null, count: 0, streak: 0 })
 
   const goalStateLoadedRef  = useRef(false)
   const prevPctRef          = useRef(null)
@@ -129,6 +131,7 @@ export default function DashboardTab({ uid, user }) {
       }),
       subscribeGymStats(uid, setGymStats),
       subscribeDayCompleteStreak(uid, setDayCompleteStreak),
+      subscribePomodoroStats(uid, setPomodoroStats),
     ]
     return () => unsubs.forEach(u => u())
   }, [uid])
@@ -159,6 +162,11 @@ export default function DashboardTab({ uid, user }) {
 
   const tareasSemana      = tareas.filter(t => (t.alcance || 'general') === 'semanal')
   const tareasAltaPrio    = tareas.filter(t => t.prioridad === 'alta' && !t.completada)
+
+  async function handleChangeBloque(newMinutes) {
+    const v = vars.find(v => v.key === 'tiempo_bloque_estudio')
+    if (v) await updateVariable(uid, v.firestoreId, { val: JSON.stringify(newMinutes) })
+  }
 
   const hour     = new Date().getHours()
   const greeting = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
@@ -199,6 +207,7 @@ export default function DashboardTab({ uid, user }) {
         <StatCard label="Racha"      num={racha}                   unit=" días"  color="var(--amber)"  suffix="🔥" />
         <StatCard label="Gym"        num={gymStats.streak}         unit=" días"  color="var(--green)"  suffix="🏋️" />
         <StatCard label="Días 100%"  num={dayCompleteStreak.streak}              color="#e0bd6b"       suffix="✨" />
+        <StatCard label="Racha estudio" num={pomodoroStats.streak}   unit=" días"  color="var(--violet)" suffix="⏱️" />
         <StatCard label="Meta PAES"  num={metaPaes}                              color="var(--blue)" />
       </div>
 
@@ -220,6 +229,7 @@ export default function DashboardTab({ uid, user }) {
         <FocusMode
           uid={uid}
           bloque={bloque} descanso={descanso} micro={micro} metaBloq={metaBloq}
+          onChangeBloque={handleChangeBloque}
           onClose={() => setShowFocus(false)}
         />
       )}
