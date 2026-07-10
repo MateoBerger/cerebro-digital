@@ -3,6 +3,8 @@ import {
   subscribeTareas, addTarea, updateTarea, deleteTarea,
   subscribeTaskLabels, saveTaskLabels,
 } from '../firebase/db'
+import { playCompleteSound } from '../utils/sound'
+import EmptyState from './EmptyState'
 
 // ── Constantes ─────────────────────────────────────────────────────────────────
 
@@ -195,6 +197,7 @@ export default function TareasTab({ uid }) {
 
   async function handleToggle(t) {
     const nowDone = !t.completada
+    if (nowDone) playCompleteSound()
     await updateTarea(uid, t.id, { completada: nowDone })
     if (nowDone && t.recurrence?.type && t.recurrence.type !== 'none') {
       const nextFecha = nextRecurrenceDate(t.recurrence, t.fecha)
@@ -854,8 +857,8 @@ function TareaSeccion({ uid, alc, tareas, labels, sortKey, form, setField, onOpe
       )}
 
       {pendientes.length === 0 && completadas.length === 0 && !isNewHere && (
-        <div style={{ padding: '18px 0 10px', borderTop: '1px dashed var(--border)' }}>
-          <span style={{ fontSize: '12px', color: 'var(--text2)' }}>Sin tareas · presioná Agregar para empezar</span>
+        <div style={{ borderTop: '1px dashed var(--border)' }}>
+          <EmptyState size="sm" text="Sin tareas" hint="Presioná Agregar para empezar" />
         </div>
       )}
 

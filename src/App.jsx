@@ -17,6 +17,9 @@ import AssistantAvatar from './components/AssistantAvatar'
 import NotifPrompt    from './components/NotifPrompt'
 import IntroAnimation from './components/IntroAnimation'
 import LoadingScreen  from './components/LoadingScreen'
+import AppBackground  from './components/AppBackground'
+import SectionHeading from './components/SectionHeading'
+import { isSoundEnabled, setSoundEnabled } from './utils/sound'
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const SCREENS       = ['left', 'center', 'right']
@@ -25,19 +28,10 @@ const SCREEN_SHORT  = ['Dashboard', 'Diario', 'Calendario']
 
 // ── Separador dorado entre secciones ─────────────────────────────────────────
 function SectionDivider({ label }) {
+  if (!label) return <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(224,189,107,.28), transparent)', margin: '6px 24px 22px' }} />
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '6px 24px 22px' }}>
-      <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(224,189,107,.28))' }} />
-      {label && (
-        <span style={{
-          fontSize: '9px', fontWeight: 700, color: 'var(--text2)',
-          letterSpacing: '1.8px', textTransform: 'uppercase',
-          padding: '0 4px', whiteSpace: 'nowrap',
-        }}>
-          {label}
-        </span>
-      )}
-      <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(224,189,107,.28), transparent)' }} />
+    <div style={{ padding: '6px 24px 22px' }}>
+      <SectionHeading size="lg" title={label} />
     </div>
   )
 }
@@ -304,7 +298,7 @@ function OverlayPanel({ overlay, onClose, uid, onInfo }) {
 }
 
 // ── Barra superior ────────────────────────────────────────────────────────────
-function TopBar({ user, theme, onThemeToggle, onLogout, screenIdx }) {
+function TopBar({ user, theme, onThemeToggle, soundOn, onSoundToggle, onLogout, screenIdx }) {
   const initials = user.displayName
     ? user.displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
     : (user.email?.[0] || '?').toUpperCase()
@@ -333,6 +327,19 @@ function TopBar({ user, theme, onThemeToggle, onLogout, screenIdx }) {
               </svg>
             : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+              </svg>
+          }
+        </button>
+        <button onClick={onSoundToggle} title={soundOn ? 'Silenciar sonidos' : 'Activar sonidos'} className="topbar-icon-btn">
+          {soundOn
+            ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <path d="M15.54 8.46a5 5 0 010 7.07M18.36 5.64a9 9 0 010 12.72"/>
+              </svg>
+            : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <line x1="23" y1="9" x2="17" y2="15"/>
+                <line x1="17" y1="9" x2="23" y2="15"/>
               </svg>
           }
         </button>
@@ -374,6 +381,7 @@ export default function App() {
   const [screen, setScreen]           = useState('center')
   const [overlay, setOverlay]         = useState(null)
   const [theme, setTheme]             = useState(() => localStorage.getItem('cd-theme') || 'dark')
+  const [soundOn, setSoundOnState]    = useState(() => isSoundEnabled())
   const [info, setInfo]               = useState('')
   const { token: gcalToken, saveToken: saveGcalToken, handleTokenExpired: onGcalExpired } = useGCalToken()
 
@@ -410,11 +418,14 @@ export default function App() {
 
   return (
     <>
+      <AppBackground />
       <IntroAnimation user={user} />
 
       <TopBar
         user={user} theme={theme}
         onThemeToggle={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+        soundOn={soundOn}
+        onSoundToggle={() => setSoundOnState(v => { setSoundEnabled(!v); return !v })}
         onLogout={() => signOut(auth)}
         screenIdx={screenIdx}
       />

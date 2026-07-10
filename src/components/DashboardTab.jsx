@@ -5,6 +5,10 @@ import {
   getCheckinsWeek, subscribeGymStats, markGymSession,
   subscribeDayCompleteStreak, recordDayComplete,
 } from '../firebase/db'
+import SectionHeading from './SectionHeading'
+import CountUp from './CountUp'
+import EmptyState from './EmptyState'
+import { playCompleteSound, playCelebrationSound } from '../utils/sound'
 
 // ── Constantes editables ──────────────────────────────────────
 const PAES_DATE = '2026-11-30' // lunes 30 nov 2026 — primer día PAES Regular Admisión 2027
@@ -137,7 +141,7 @@ export default function DashboardTab({ uid, user }) {
     if (!goalStateLoadedRef.current || dayTotal === 0) return
     if (prevPctRef.current !== null && prevPctRef.current < 100 && dayPct === 100) {
       setShowConfetti(true)
-      celebrationSound()
+      playCelebrationSound()
       recordDayComplete(uid, dayCompleteStreakRef.current).then(setCelebrationStreak)
     }
     prevPctRef.current = dayPct
@@ -189,11 +193,11 @@ export default function DashboardTab({ uid, user }) {
 
       {/* Stats */}
       <div className="stagger-children" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px', marginBottom: '24px' }}>
-        <StatCard label="Modo"       value={String(modo)}                      color={MODO_COLOR[modo] || 'var(--violet)'} />
-        <StatCard label="Racha"      value={`${racha} días`}                   color="var(--amber)"  suffix="🔥" />
-        <StatCard label="Gym"        value={`${gymStats.streak} días`}         color="var(--green)"  suffix="🏋️" />
-        <StatCard label="Días 100%"  value={`${dayCompleteStreak.streak}`}     color="#e0bd6b"       suffix="✨" />
-        <StatCard label="Meta PAES"  value={String(metaPaes)}                  color="var(--blue)" />
+        <StatCard label="Modo"       value={String(modo)}                                            color={MODO_COLOR[modo] || 'var(--violet)'} />
+        <StatCard label="Racha"      num={racha}                   unit=" días"  color="var(--amber)"  suffix="🔥" />
+        <StatCard label="Gym"        num={gymStats.streak}         unit=" días"  color="var(--green)"  suffix="🏋️" />
+        <StatCard label="Días 100%"  num={dayCompleteStreak.streak}              color="#e0bd6b"       suffix="✨" />
+        <StatCard label="Meta PAES"  num={metaPaes}                              color="var(--blue)" />
       </div>
 
       {/* Frase del día */}
@@ -233,7 +237,7 @@ function PaesCountdown({ days }) {
           fontWeight: 700, fontSize: '30px', color,
           fontFamily: 'var(--font-display)', letterSpacing: '-.03em',
           textShadow: `0 0 28px ${color}`,
-        }}>{days}</span>
+        }}><CountUp value={days} duration={900} /></span>
         <span style={{ fontSize: '14px', color: 'var(--text1)' }}>
           {days === 1 ? 'día' : 'días'} para la PAES
         </span>
@@ -282,14 +286,15 @@ function WeekSummaryCard({ tareas, checkins }) {
 
   return (
     <div className="card" style={{ marginBottom: '16px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-        <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text0)', letterSpacing: '.1px' }}>
-          📋 Resumen de la semana
-        </h2>
-        <span style={{ fontSize: '11px', color: 'var(--text2)' }}>
-          {completadas.length} completadas · {pendientes.length} pendientes
-        </span>
-      </div>
+      <SectionHeading
+        title="Resumen de la semana"
+        icon={
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+          </svg>
+        }
+        right={<span>{completadas.length} completadas · {pendientes.length} pendientes</span>}
+      />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '20px' }}>
         {/* Check-ins */}
@@ -371,7 +376,7 @@ function WeekSummaryCard({ tareas, checkins }) {
 }
 
 // ── StatCard ──────────────────────────────────────────────────
-function StatCard({ label, value, color, suffix }) {
+function StatCard({ label, value, num, unit, color, suffix }) {
   return (
     <div className="card" style={{ padding: '16px 18px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
@@ -388,7 +393,7 @@ function StatCard({ label, value, color, suffix }) {
         fontFamily: 'var(--font-display)', letterSpacing: '-.02em',
         display: 'flex', alignItems: 'center', gap: '6px',
       }}>
-        {value}
+        {num != null ? <><CountUp value={num} />{unit}</> : value}
         {suffix && <span style={{ fontSize: '16px' }}>{suffix}</span>}
       </div>
     </div>
@@ -398,19 +403,15 @@ function StatCard({ label, value, color, suffix }) {
 // ── CardHeader ────────────────────────────────────────────────
 function CardHeader({ title }) {
   return (
-    <div style={{ marginBottom: '14px' }}>
-      <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text0)', letterSpacing: '.1px' }}>{title}</h2>
-    </div>
-  )
-}
-
-// ── EmptyState ────────────────────────────────────────────────
-function EmptyState({ text, hint }) {
-  return (
-    <div style={{ padding: '16px 0 4px', textAlign: 'center' }}>
-      <p style={{ color: 'var(--text1)', fontSize: '13px' }}>{text}</p>
-      {hint && <p style={{ color: 'var(--text2)', fontSize: '11px', marginTop: '4px' }}>{hint}</p>}
-    </div>
+    <SectionHeading
+      title={title}
+      icon={
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="13" r="8" />
+          <path d="M12 9v4l3 2M9 2h6" />
+        </svg>
+      }
+    />
   )
 }
 
@@ -431,6 +432,7 @@ function MetasDiariasCard({ items, state, uid, gymStats }) {
 
   async function handleToggle(item) {
     const newVal = !state[item.id]
+    if (newVal) playCompleteSound()
     await toggleDailyGoal(uid, TODAY, item.id, newVal)
     if (item.id === 'item_gym' && newVal) {
       await markGymSession(uid, gymStats)
@@ -439,16 +441,21 @@ function MetasDiariasCard({ items, state, uid, gymStats }) {
 
   return (
     <div className="card">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-        <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text0)', letterSpacing: '.1px' }}>Hábitos de hoy</h2>
-        {visibleItems.length > 0 && (
-          <span style={{ fontSize: '11px', color: allDone ? 'var(--green)' : 'var(--text2)', fontWeight: allDone ? 600 : 400 }}>
+      <SectionHeading
+        title="Hábitos de hoy"
+        icon={
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+          </svg>
+        }
+        right={visibleItems.length > 0 && (
+          <span style={{ color: allDone ? 'var(--green)' : 'var(--text2)', fontWeight: allDone ? 600 : 400 }}>
             {checked}/{visibleItems.length}
           </span>
         )}
-      </div>
+      />
       {visibleItems.length === 0 ? (
-        <EmptyState text="Sin hábitos configurados" hint="Pedile al asistente que agregue uno" />
+        <EmptyState size="sm" text="Sin hábitos configurados" hint="Pedile al asistente que agregue uno" />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {visibleItems.map(item => {
@@ -490,22 +497,26 @@ function MetasDiariasCard({ items, state, uid, gymStats }) {
 // ── TareasAltaCard (prioridad ALTA del día) ───────────────────
 function TareasAltaCard({ tareas, uid }) {
   async function toggle(t) {
+    if (!t.completada) playCompleteSound()
     await updateTarea(uid, t.id, { completada: !t.completada })
   }
   return (
     <div className="card">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-        <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text0)', letterSpacing: '.1px' }}>
-          Prioridad alta
-        </h2>
-        {tareas.length > 0 && (
-          <span style={{ fontSize: '11px', color: '#f07272', fontWeight: 600 }}>
+      <SectionHeading
+        title="Prioridad alta"
+        icon={
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><line x1="4" y1="22" x2="4" y2="15" />
+          </svg>
+        }
+        right={tareas.length > 0 && (
+          <span style={{ color: '#f07272', fontWeight: 600 }}>
             {tareas.length} pendiente{tareas.length !== 1 ? 's' : ''}
           </span>
         )}
-      </div>
+      />
       {tareas.length === 0 ? (
-        <EmptyState text="Sin tareas de alta prioridad" hint="¡Todo bajo control!" />
+        <EmptyState size="sm" text="Sin tareas de alta prioridad" hint="¡Todo bajo control!" />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {tareas.map(t => <TareaRow key={t.id} tarea={t} onToggle={() => toggle(t)} />)}
@@ -521,21 +532,25 @@ function MetasCard({ tareas, uid }) {
   const completadas = tareas.filter(t => t.completada)
 
   async function toggle(t) {
+    if (!t.completada) playCompleteSound()
     await updateTarea(uid, t.id, { completada: !t.completada })
   }
 
   return (
     <div className="card">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-        <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text0)', letterSpacing: '.1px' }}>Tareas de la semana</h2>
-        {tareas.length > 0 && (
-          <span style={{ fontSize: '11px', color: 'var(--text2)' }}>
-            {completadas.length}/{tareas.length}
-          </span>
+      <SectionHeading
+        title="Tareas de la semana"
+        icon={
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" />
+          </svg>
+        }
+        right={tareas.length > 0 && (
+          <span>{completadas.length}/{tareas.length}</span>
         )}
-      </div>
+      />
       {tareas.length === 0 ? (
-        <EmptyState text="Sin tareas semanales" hint="Agregalas en Tareas → Semanales" />
+        <EmptyState size="sm" text="Sin tareas semanales" hint="Agregalas en Tareas → Semanales" />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {pendientes.map(t => <TareaRow key={t.id} tarea={t} onToggle={() => toggle(t)} />)}
@@ -743,25 +758,4 @@ function DayCompleteConfetti({ displayName, streak, onDone }) {
       </div>
     </div>
   )
-}
-
-function celebrationSound() {
-  try {
-    const ctx   = new (window.AudioContext || window.webkitAudioContext)()
-    const notes = [261.63, 329.63, 392.00, 523.25] // C4 E4 G4 C5
-    notes.forEach((freq, i) => {
-      const osc  = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.type            = 'sine'
-      osc.frequency.value = freq
-      const t0 = ctx.currentTime + i * 0.20
-      gain.gain.setValueAtTime(0, t0)
-      gain.gain.linearRampToValueAtTime(0.13, t0 + 0.06)
-      gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.95)
-      osc.start(t0)
-      osc.stop(t0 + 1.05)
-    })
-  } catch (_) {}
 }

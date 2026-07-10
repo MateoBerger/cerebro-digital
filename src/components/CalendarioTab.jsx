@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import { subscribeGymStats, markGymSession, getBloquesOnce, markBloquesMigrated } from '../firebase/db'
 import { gcalListarEventos, gcalCrearEvento, gcalActualizarEvento, gcalEliminarEvento, gcalEventToBloque } from '../utils/gcalApi'
 import { requestCalendarAccess } from '../hooks/useGCalToken'
+import { playCompleteSound } from '../utils/sound'
+import CountUp from './CountUp'
 
 // ── Constantes ─────────────────────────────────────────────────────────────────
 
@@ -129,6 +131,7 @@ export default function CalendarioTab({ uid, gcalToken, onGcalToken, onGcalExpir
   async function handleMarkGym() {
     if (gymSaving || gymStats.lastGymDate === todayStr()) return
     setGymSaving(true)
+    playCompleteSound()
     await markGymSession(uid, gymStats)
     setGymSaving(false)
   }
@@ -664,7 +667,7 @@ function GymWidget({ gymStats, saving, onMark }) {
           <span style={{
             fontFamily:"'IBM Plex Mono', monospace", fontSize:'15px', fontWeight:700,
             color:'var(--amber)', lineHeight:1,
-          }}>{gymStats.streak}</span>
+          }}><CountUp value={gymStats.streak} /></span>
           <span style={{ fontSize:'10px', color:'var(--text2)' }}>días</span>
         </div>
         <div style={{ fontSize:'9px', color:'var(--text2)', lineHeight:1, marginTop:'1px' }}>Racha gym</div>

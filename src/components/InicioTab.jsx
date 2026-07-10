@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { saveCheckin, subscribeCheckin, subscribeTareas } from '../firebase/db'
 import { gcalListarEventos } from '../utils/gcalApi'
+import SectionHeading from './SectionHeading'
+import EmptyState from './EmptyState'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -153,12 +155,15 @@ export default function InicioTab({ uid, gcalToken, onGcalExpired, onTabChange }
 
             {/* 2 ── Check-in diario */}
             <div className="card">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '18px' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
-                </svg>
-                <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text0)' }}>Check-in del día</h2>
-              </div>
+              <SectionHeading
+                title="Check-in del día"
+                icon={
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
+                  </svg>
+                }
+                style={{ marginBottom: '18px' }}
+              />
 
               {saved === undefined && (
                 <p style={{ color: 'var(--text2)', fontSize: '13px' }}>Cargando...</p>
@@ -200,13 +205,15 @@ export default function InicioTab({ uid, gcalToken, onGcalExpired, onTabChange }
 function CalendarioDiaCard({ gcalToken, eventosHoy }) {
   return (
     <div className="card">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="4" width="18" height="18" rx="2"/>
-          <path d="M16 2v4M8 2v4M3 10h18"/>
-        </svg>
-        <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text0)' }}>Hoy en tu calendario</h2>
-      </div>
+      <SectionHeading
+        title="Hoy en tu calendario"
+        icon={
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2"/>
+            <path d="M16 2v4M8 2v4M3 10h18"/>
+          </svg>
+        }
+      />
 
       {/* Sin GCal conectado */}
       {!gcalToken && (
@@ -233,9 +240,7 @@ function CalendarioDiaCard({ gcalToken, eventosHoy }) {
 
       {/* Sin eventos */}
       {gcalToken && eventosHoy !== null && eventosHoy.length === 0 && (
-        <p style={{ fontSize: '12px', color: 'var(--text2)', textAlign: 'center', padding: '10px 0' }}>
-          Sin eventos programados para hoy — día libre.
-        </p>
+        <EmptyState size="sm" text="Sin eventos programados para hoy" hint="Día libre." />
       )}
 
       {/* Lista de eventos */}
@@ -305,38 +310,41 @@ function TareasUrgentesCard({ vencidas, hoy, onClick }) {
         onMouseLeave={e => { if (onClick) e.currentTarget.style.boxShadow = '' }}
       >
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: hasUrgent ? '12px' : '0' }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-            stroke={vencidas.length > 0 ? '#f07272' : hoy.length > 0 ? '#f0a740' : 'var(--accent)'}
-            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <polyline points="12 6 12 12 16 14" />
-          </svg>
-          <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text0)', flex: 1 }}>
-            Tareas urgentes de hoy
-          </h2>
-          {hasUrgent && (
-            <span style={{
-              fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
-              background: vencidas.length > 0 ? 'rgba(240,114,114,.12)' : 'rgba(240,167,64,.12)',
-              color:      vencidas.length > 0 ? '#f07272' : '#f0a740',
-              border:     `1px solid ${vencidas.length > 0 ? 'rgba(240,114,114,.3)' : 'rgba(240,167,64,.3)'}`,
-            }}>
-              {total}
-            </span>
-          )}
-          {onClick && (
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 18l6-6-6-6" />
+        <SectionHeading
+          title="Tareas urgentes de hoy"
+          style={{ marginBottom: hasUrgent ? '12px' : '0' }}
+          icon={
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke={vencidas.length > 0 ? '#f07272' : hoy.length > 0 ? '#f0a740' : 'currentColor'}
+              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
             </svg>
-          )}
-        </div>
+          }
+          right={
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {hasUrgent && (
+                <span style={{
+                  fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
+                  background: vencidas.length > 0 ? 'rgba(240,114,114,.12)' : 'rgba(240,167,64,.12)',
+                  color:      vencidas.length > 0 ? '#f07272' : '#f0a740',
+                  border:     `1px solid ${vencidas.length > 0 ? 'rgba(240,114,114,.3)' : 'rgba(240,167,64,.3)'}`,
+                }}>
+                  {total}
+                </span>
+              )}
+              {onClick && (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              )}
+            </div>
+          }
+        />
 
         {/* Sin urgentes */}
         {!hasUrgent && (
-          <p style={{ fontSize: '12px', color: 'var(--text2)', marginTop: '8px' }}>
-            Sin tareas urgentes para hoy. ¡Bien!
-          </p>
+          <EmptyState size="sm" text="Sin tareas urgentes para hoy" hint="¡Bien!" />
         )}
 
         {/* Lista compacta */}
