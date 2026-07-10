@@ -865,6 +865,12 @@ input[type="range"]::-moz-range-track {
   to   { transform: scale(1); opacity: 1; }
 }
 
+/* ── Modo enfoque: anillo de progreso ── */
+.focus-ring { transition: stroke-dashoffset 1s linear; }
+@media (prefers-reduced-motion: reduce) {
+  .focus-ring { transition: none !important; }
+}
+
 /* ── Encabezados de sección (ícono + línea decorativa) ── */
 .section-heading {
   display: flex; align-items: center; gap: 8px;

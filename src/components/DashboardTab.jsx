@@ -8,6 +8,7 @@ import {
 import SectionHeading from './SectionHeading'
 import CountUp from './CountUp'
 import EmptyState from './EmptyState'
+import FocusMode from './FocusMode'
 import { playCompleteSound, playCelebrationSound } from '../utils/sound'
 
 // ── Constantes editables ──────────────────────────────────────
@@ -93,6 +94,7 @@ export default function DashboardTab({ uid, user }) {
   const [dayCompleteStreak, setDayCompleteStreak]= useState({ streak: 0, lastCompleteDate: null })
   const [showConfetti,      setShowConfetti]     = useState(false)
   const [celebrationStreak, setCelebrationStreak]= useState(0)
+  const [showFocus,         setShowFocus]        = useState(false)
 
   const goalStateLoadedRef  = useRef(false)
   const prevPctRef          = useRef(null)
@@ -211,8 +213,16 @@ export default function DashboardTab({ uid, user }) {
         <MetasDiariasCard items={goalItems} state={goalState} uid={uid} gymStats={gymStats} />
         <TareasAltaCard   tareas={tareasAltaPrio} uid={uid} />
         <MetasCard        tareas={tareasSemana}   uid={uid} />
-        <PomodoroCard     bloque={bloque} descanso={descanso} micro={micro} meta={metaBloq} />
+        <PomodoroCard     bloque={bloque} descanso={descanso} micro={micro} meta={metaBloq} onOpenFocus={() => setShowFocus(true)} />
       </div>
+
+      {showFocus && (
+        <FocusMode
+          uid={uid}
+          bloque={bloque} descanso={descanso} micro={micro} metaBloq={metaBloq}
+          onClose={() => setShowFocus(false)}
+        />
+      )}
     </div>
   )
 }
@@ -598,7 +608,8 @@ function TareaRow({ tarea, onToggle }) {
 }
 
 // ── PomodoroCard ──────────────────────────────────────────────
-function PomodoroCard({ bloque, descanso, micro, meta }) {
+function PomodoroCard({ bloque, descanso, micro, meta, onOpenFocus }) {
+  const [hov, setHov] = useState(false)
   return (
     <div className="card">
       <CardHeader title="Configuración Pomodoro" />
@@ -610,6 +621,25 @@ function PomodoroCard({ bloque, descanso, micro, meta }) {
           <PomRow label="Meta diaria"     value={`${meta} bloques`} color="var(--accent)" />
         </div>
       </div>
+      <button
+        onClick={onOpenFocus}
+        onMouseEnter={() => setHov(true)}
+        onMouseLeave={() => setHov(false)}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
+          width: '100%', marginTop: '14px', padding: '9px 14px',
+          borderRadius: 'var(--radius-sm)', border: `1px solid ${hov ? 'var(--accent)' : 'var(--accent-border)'}`,
+          background: hov ? 'var(--accent)' : 'var(--accent-dim)',
+          color: hov ? '#1a1608' : 'var(--accent)',
+          fontSize: '12.5px', fontWeight: 600, fontFamily: 'Inter, sans-serif',
+          cursor: 'pointer', transition: 'all .15s',
+        }}
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+        </svg>
+        Modo enfoque
+      </button>
     </div>
   )
 }

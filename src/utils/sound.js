@@ -39,6 +39,29 @@ export function playCompleteSound() {
   } catch (_) {}
 }
 
+// Chime suave y ascendente — fin de un bloque/pausa del modo enfoque.
+export function playPhaseEndSound() {
+  if (!isSoundEnabled()) return
+  try {
+    const ctx   = getCtx()
+    const notes = [392.00, 523.25] // G4 -> C5
+    notes.forEach((freq, i) => {
+      const osc  = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.type            = 'sine'
+      osc.frequency.value = freq
+      const t0 = ctx.currentTime + i * 0.16
+      gain.gain.setValueAtTime(0, t0)
+      gain.gain.linearRampToValueAtTime(0.1, t0 + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.6)
+      osc.start(t0)
+      osc.stop(t0 + 0.65)
+    })
+  } catch (_) {}
+}
+
 // Celebración más elaborada — día completado al 100%.
 export function playCelebrationSound() {
   if (!isSoundEnabled()) return

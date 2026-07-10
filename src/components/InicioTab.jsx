@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { saveCheckin, subscribeCheckin, subscribeTareas } from '../firebase/db'
-import { gcalListarEventos } from '../utils/gcalApi'
 import SectionHeading from './SectionHeading'
 import EmptyState from './EmptyState'
+import NextEventWidget from './NextEventWidget'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -51,36 +51,12 @@ function sliderColor(v) {
 
 // ── Componente principal ───────────────────────────────────────────────────────
 
-export default function InicioTab({ uid, gcalToken, onGcalExpired, onTabChange }) {
+export default function InicioTab({ uid, gcalToken, eventosHoy, onTabChange }) {
   const [fields, setFields]    = useState(DEFAULT_VALUES)
   const [saved, setSaved]      = useState(undefined)
   const [editing, setEditing]  = useState(false)
   const [saving, setSaving]    = useState(false)
-  const [eventosHoy, setEvHoy] = useState(null)
   const [tareas, setTareas]    = useState([])
-
-  // Eventos GCal de hoy
-  useEffect(() => {
-    if (!gcalToken) return
-    const start = new Date(); start.setHours(0, 0, 0, 0)
-    const end   = new Date(); end.setHours(23, 59, 59, 999)
-    gcalListarEventos(gcalToken, start, end)
-      .then(items => {
-        setEvHoy(
-          items
-            .filter(e => e.start?.dateTime)
-            .sort((a, b) => new Date(a.start.dateTime) - new Date(b.start.dateTime))
-            .map(e => ({
-              id:         e.id,
-              titulo:     e.summary || '(sin título)',
-              horaInicio: new Date(e.start.dateTime).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }),
-              horaFin:    new Date(e.end.dateTime).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }),
-              tipo:       e.extendedProperties?.private?.tipo || 'otro',
-            }))
-        )
-      })
-      .catch(err => { if (err.code === 'token_expired') onGcalExpired?.(); setEvHoy([]) })
-  }, [gcalToken])
 
   // Check-in de hoy
   useEffect(() => {
@@ -149,6 +125,11 @@ export default function InicioTab({ uid, gcalToken, onGcalExpired, onTabChange }
               {greeting}, Mateo.
             </h1>
             <p style={{ color: 'var(--text2)', fontSize: '14px' }}>{dateCap}</p>
+          </div>
+
+          {/* Próximo evento — siempre visible, arriba de todo */}
+          <div style={{ marginBottom: '20px' }}>
+            <NextEventWidget gcalToken={gcalToken} eventosHoy={eventosHoy} />
           </div>
 
           <div className="stagger-children" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

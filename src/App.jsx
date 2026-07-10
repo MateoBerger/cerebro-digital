@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { auth } from './firebase/config'
 import { useGCalToken } from './hooks/useGCalToken'
+import { useEventosHoy } from './hooks/useEventosHoy'
 import { useChat } from './hooks/useChat'
 import LoginPage      from './pages/LoginPage'
 import InicioTab      from './components/InicioTab'
@@ -384,6 +385,7 @@ export default function App() {
   const [soundOn, setSoundOnState]    = useState(() => isSoundEnabled())
   const [info, setInfo]               = useState('')
   const { token: gcalToken, saveToken: saveGcalToken, handleTokenExpired: onGcalExpired } = useGCalToken()
+  const eventosHoy = useEventosHoy(gcalToken, onGcalExpired)
 
   const screenIdx   = SCREENS.indexOf(screen)
   const touchStartX = useRef(null)
@@ -447,7 +449,7 @@ export default function App() {
               <InicioTab
                 uid={user.uid}
                 gcalToken={gcalToken}
-                onGcalExpired={onGcalExpired}
+                eventosHoy={eventosHoy}
                 onTabChange={t => { if (t === 'tareas') setScreen('left') }}
               />
               <SectionDivider label="Asistente IA" />

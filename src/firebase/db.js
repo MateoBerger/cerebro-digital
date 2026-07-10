@@ -392,6 +392,27 @@ export async function addDailyGoalItem(uid, label) {
   return id
 }
 
+// ── POMODORO STATS ────────────────────────────────────────
+// users/{uid}/pomodoro-data/stats → { date, count }
+
+export function subscribePomodoroStats(uid, callback) {
+  return onSnapshot(doc(db, 'users', uid, 'pomodoro-data', 'stats'), snap => {
+    callback(snap.exists() ? snap.data() : { date: null, count: 0 })
+  })
+}
+
+export async function recordPomodoroBlock(uid, currentStats) {
+  const today = gymChileDate()
+  const count = currentStats?.date === today ? (currentStats.count || 0) + 1 : 1
+
+  await setDoc(doc(db, 'users', uid, 'pomodoro-data', 'stats'), {
+    date:  today,
+    count,
+  }, { merge: true })
+
+  return count
+}
+
 // ── TASK LABELS ───────────────────────────────────────────────────────────────
 // users/{uid}/settings/task-labels → { labels: [{id, name, color}] }
 
