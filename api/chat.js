@@ -181,6 +181,20 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'consultar_tutor_paes',
+      description: 'Consulta al Tutor PAES, un especialista en la PAES chilena que analiza el progreso de Mateo, detecta debilidades por materia y propone práctica concreta. Usala SOLO cuando Mateo pregunte específicamente por su preparación PAES, su progreso, qué estudiar, quiera detectar debilidades, o pida práctica/ejercicios/repaso. NO la uses para saludos, charla general, ni preguntas triviales — cada consulta tiene un costo. Como mucho una consulta por turno.',
+      parameters: {
+        type: 'object',
+        properties: {
+          pregunta: { type: 'string', description: 'La pregunta o pedido concreto para el Tutor PAES, en tus palabras (podés reformular lo que dijo Mateo para que sea más específico)' },
+        },
+        required: ['pregunta'],
+      },
+    },
+  },
 ]
 
 // ── Conversión mensajes frontend → formato OpenAI-compatible ───
@@ -318,6 +332,9 @@ Usá las herramientas ÚNICAMENTE cuando el mensaje contenga una intención clar
 
 ## Excepción: estado del día (implícito, sin pedir permiso)
 No dependas del check-in de sliders para saber cómo viene Mateo — preguntáselo vos, conversando, cuando haga falta (por ejemplo si te pide ayuda para organizar el día y no tenés ningún estado registrado). Y al revés: en cuanto Mateo cuente cómo se siente o cómo viene ("ando cansado", "dormí mal", "hoy vengo con todo", "tengo poco tiempo"), llamá set_estado_dia enseguida con un resumen corto y un nivel — no le pidas confirmación, es solo tomar nota. Después seguí la charla con naturalidad. Usá ese estado (o el check-in si no hay estado conversacional) para calibrar tus sugerencias: más liviano y con menos exigencia si el nivel es bajo, más ambicioso si es alto.
+
+## Especialista disponible: Tutor PAES
+Tenés acceso a un especialista, el Tutor PAES (herramienta consultar_tutor_paes), que analiza en profundidad el progreso PAES de Mateo y propone práctica concreta. Es un consultor: te devuelve un análisis en texto, no ejecuta nada — si sugiere crear una tarea o un mini-ensayo, sos VOS quien decide si lo hace (con tus propias herramientas) o si primero se lo proponés a Mateo. Consultalo solo cuando la pregunta sea realmente sobre preparación PAES (progreso, debilidades, qué estudiar, práctica) — no lo llames para saludos ni charla trivial, y nunca más de una vez por turno. Cuando te responda, NUNCA le pegues su texto tal cual a Mateo: reformulalo con tu propio tono, como si la conclusión fuera tuya.
 
 ## REGLA CRÍTICA — Múltiples acciones en un mismo mensaje
 Cuando Mateo pide N acciones, tu respuesta DEBE incluir N tool calls, uno por acción, TODOS en la MISMA respuesta. NUNCA ejecutes solo la primera.

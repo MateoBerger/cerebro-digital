@@ -50,6 +50,7 @@ function toolLabel(name) {
     add_bloque_calendario:     'Agregando bloque al calendario…',
     add_meta_diaria:           'Agregando meta diaria…',
     set_estado_dia:            'Tomando nota de cómo venís…',
+    consultar_tutor_paes:      'Consultando al Tutor PAES…',
     listar_eventos_calendario: 'Consultando Google Calendar…',
     crear_evento_calendario:   'Creando evento en Calendar…',
     editar_evento_calendario:  'Editando evento en Calendar…',
@@ -304,6 +305,19 @@ export function useChat(uid) {
         await saveDailyState(uid, getLocalDate(), { resumen: toolInput.resumen, nivel: toolInput.nivel })
         return `Estado del día guardado: ${toolInput.resumen}`
 
+      case 'consultar_tutor_paes': {
+        // Especialista consultor: solo devuelve texto, nunca ejecuta nada.
+        // El Supervisor arma el contexto que le pasa — el Tutor no busca datos por su cuenta.
+        const ctx = buildContext()
+        const r = await fetch('/api/agents/tutor-paes', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ pregunta: toolInput.pregunta, contexto: ctx.paes }),
+        })
+        const data = await parseResponse(r)
+        return data.texto || 'El Tutor PAES no tuvo una respuesta esta vez.'
+      }
+
       case 'listar_eventos_calendario': {
         const gcalToken = getGcalToken()
         if (!gcalToken) return 'Error: Google Calendar no está conectado o el token expiró'
@@ -466,6 +480,8 @@ export function useChat(uid) {
       let allBorrarResults = []
       // listar_eventos no cuenta como "non-borrar" (es paso intermedio del flujo de borrado)
       let hasNonBorrar = false
+      // Tope duro (no solo instrucción de prompt): máximo 1 consulta al Tutor PAES por turno
+      let tutorPaesCalls = 0
 
       // ── Primera llamada al modelo ─────────────────────────────
       let d = await parseResponse(await fetch('/api/chat', {
@@ -511,6 +527,14 @@ export function useChat(uid) {
             result = await executeTool(block.name, block.input)
             allBorrarBlocks.push(block)
             allBorrarResults.push({ tool_use_id: block.id, result, isBatch: true, batchResult: result })
+          } else if (block.name === 'consultar_tutor_paes') {
+            hasNonBorrar = true
+            if (tutorPaesCalls >= 1) {
+              result = 'Ya consultaste al Tutor PAES en este turno — usá la respuesta que ya tenés, no lo vuelvas a llamar.'
+            } else {
+              tutorPaesCalls++
+              result = await executeTool(block.name, block.input)
+            }
           } else {
             if (block.name !== 'listar_eventos_calendario') hasNonBorrar = true
             result = await executeTool(block.name, block.input)
