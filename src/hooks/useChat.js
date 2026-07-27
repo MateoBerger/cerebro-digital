@@ -51,6 +51,7 @@ function toolLabel(name) {
     add_meta_diaria:           'Agregando meta diaria…',
     set_estado_dia:            'Tomando nota de cómo venís…',
     consultar_tutor_paes:      'Consultando al Tutor PAES…',
+    consultar_secretario:      'Consultando al Secretario…',
     listar_eventos_calendario: 'Consultando Google Calendar…',
     crear_evento_calendario:   'Creando evento en Calendar…',
     editar_evento_calendario:  'Editando evento en Calendar…',
@@ -318,6 +319,24 @@ export function useChat(uid) {
         return data.texto || 'El Tutor PAES no tuvo una respuesta esta vez.'
       }
 
+      case 'consultar_secretario': {
+        // Especialista consultor: solo devuelve texto, nunca ejecuta nada.
+        // El Supervisor arma el contexto que le pasa — el Secretario no busca datos por su cuenta.
+        const ctx = buildContext()
+        const contexto = [
+          `Tareas pendientes:\n${ctx.tareas}`,
+          `Calendario de hoy:\n${ctx.calendario}`,
+          `Cómo viene el día: ${ctx.estado_dia}`,
+        ].join('\n\n')
+        const r = await fetch('/api/agents/secretario', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ pregunta: toolInput.pregunta, contexto }),
+        })
+        const data = await parseResponse(r)
+        return data.texto || 'El Secretario no tuvo una respuesta esta vez.'
+      }
+
       case 'listar_eventos_calendario': {
         const gcalToken = getGcalToken()
         if (!gcalToken) return 'Error: Google Calendar no está conectado o el token expiró'
@@ -480,8 +499,9 @@ export function useChat(uid) {
       let allBorrarResults = []
       // listar_eventos no cuenta como "non-borrar" (es paso intermedio del flujo de borrado)
       let hasNonBorrar = false
-      // Tope duro (no solo instrucción de prompt): máximo 1 consulta al Tutor PAES por turno
+      // Tope duro (no solo instrucción de prompt): máximo 1 consulta por turno a cada especialista
       let tutorPaesCalls = 0
+      let secretarioCalls = 0
 
       // ── Primera llamada al modelo ─────────────────────────────
       let d = await parseResponse(await fetch('/api/chat', {
@@ -533,6 +553,14 @@ export function useChat(uid) {
               result = 'Ya consultaste al Tutor PAES en este turno — usá la respuesta que ya tenés, no lo vuelvas a llamar.'
             } else {
               tutorPaesCalls++
+              result = await executeTool(block.name, block.input)
+            }
+          } else if (block.name === 'consultar_secretario') {
+            hasNonBorrar = true
+            if (secretarioCalls >= 1) {
+              result = 'Ya consultaste al Secretario en este turno — usá la respuesta que ya tenés, no lo vuelvas a llamar.'
+            } else {
+              secretarioCalls++
               result = await executeTool(block.name, block.input)
             }
           } else {
