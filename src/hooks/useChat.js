@@ -5,6 +5,7 @@ import {
   subscribePaesStats,
   subscribeCheckin,
   subscribeDailyGoalsConfig, subscribeDailyGoalsState, addDailyGoalItem,
+  subscribeDailyMessage, subscribeDailyState, saveDailyState,
 } from '../firebase/db'
 import { auth } from '../firebase/config'
 import {
@@ -48,6 +49,7 @@ function toolLabel(name) {
     complete_tarea:            'Actualizando tarea…',
     add_bloque_calendario:     'Agregando bloque al calendario…',
     add_meta_diaria:           'Agregando meta diaria…',
+    set_estado_dia:            'Tomando nota de cómo venís…',
     listar_eventos_calendario: 'Consultando Google Calendar…',
     crear_evento_calendario:   'Creando evento en Calendar…',
     editar_evento_calendario:  'Editando evento en Calendar…',
@@ -116,6 +118,10 @@ export function useChat(uid) {
   const [checkinHoy, setCheckinHoy] = useState(null)
   const [goalItems,  setGoalItems]  = useState([])
   const [goalState,  setGoalState]  = useState({})
+  const [dailyMessage, setDailyMessage] = useState(null)
+  const [dailyState,   setDailyState]   = useState(null)
+
+  const dailyInjectedRef = useRef(false)
 
   const [uiMessages, setUiMessages] = useState(() => {
     try {
@@ -160,9 +166,29 @@ export function useChat(uid) {
       subscribeCheckin(uid,  today, setCheckinHoy),
       subscribeDailyGoalsConfig(uid, setGoalItems),
       subscribeDailyGoalsState(uid, today, setGoalState),
+      subscribeDailyMessage(uid, today, setDailyMessage),
+      subscribeDailyState(uid, today, setDailyState),
     ]
     return () => unsubs.forEach(u => u())
   }, [uid])
+
+  // Deja esperando el mensaje diario proactivo como si el asistente lo
+  // hubiera escrito al abrir la app — se inserta una sola vez, ordenado
+  // por fecha entre el resto del historial (nunca se pisa entre sesiones
+  // porque chequea el id antes de insertarlo). Solo visual: no se agrega
+  // a apiMsgsRef porque el recorte de historial en /api/chat descarta
+  // cualquier mensaje de asistente que quede antes del primer 'user'.
+  useEffect(() => {
+    if (!uid || !dailyMessage?.text || dailyInjectedRef.current) return
+    const msgId = `daily-${dailyMessage.date}`
+    dailyInjectedRef.current = true
+    setUiMessages(prev => {
+      if (prev.some(m => m.id === msgId)) return prev
+      const ts = dailyMessage.createdAt ? new Date(dailyMessage.createdAt).getTime() : Date.now()
+      return [...prev, { id: msgId, role: 'assistant', text: dailyMessage.text, ts, isDaily: true }]
+        .sort((a, b) => (a.ts || 0) - (b.ts || 0))
+    })
+  }, [uid, dailyMessage])
 
   function buildPriorizarPrompt() {
     const today = getLocalDate()
@@ -198,7 +224,8 @@ export function useChat(uid) {
       `¿Qué hago primero hoy?`,
       ``,
       `Fecha: ${ctx.fecha}`,
-      `Mi estado según el check-in de hoy: ${ctx.checkin}`,
+      `Cómo vengo hoy: ${ctx.estado_dia}`,
+      `Check-in de sliders (si lo llené): ${ctx.checkin}`,
       ``,
       `Mi horario de hoy:`,
       ctx.calendario,
@@ -224,6 +251,10 @@ export function useChat(uid) {
       ? `Ganas de estudiar: ${checkinHoy.ganas_estudio}/10 | Energía: ${checkinHoy.energia}/10 | Ánimo: ${checkinHoy.animo}/10 | Tiempo libre: ${checkinHoy.tiempo_libre}`
       : 'Sin check-in registrado hoy'
 
+    const estadoDia = dailyState?.resumen
+      ? `${dailyState.resumen} (nivel: ${dailyState.nivel || 'sin especificar'})`
+      : 'Sin estado conversacional registrado hoy'
+
     const pendientes = tareas.filter(t => !t.completada)
     const tareasStr  = pendientes.length
       ? pendientes.map(t => {
@@ -248,7 +279,7 @@ export function useChat(uid) {
       ? goalItems.map(g => `${goalState[g.id] ? '[x]' : '[ ]'} ${g.label}`).join('\n')
       : 'Sin metas diarias configuradas'
 
-    return { fecha, todayDia, checkin, tareas: tareasStr, calendario: calStr, paes: paesStr, metas_diarias: metasDiariasStr }
+    return { fecha, todayDia, checkin, estado_dia: estadoDia, tareas: tareasStr, calendario: calStr, paes: paesStr, metas_diarias: metasDiariasStr }
   }
 
   async function executeTool(name, toolInput) {
@@ -268,6 +299,10 @@ export function useChat(uid) {
       case 'add_meta_diaria':
         await addDailyGoalItem(uid, toolInput.label)
         return `Meta diaria "${toolInput.label}" agregada`
+
+      case 'set_estado_dia':
+        await saveDailyState(uid, getLocalDate(), { resumen: toolInput.resumen, nivel: toolInput.nivel })
+        return `Estado del día guardado: ${toolInput.resumen}`
 
       case 'listar_eventos_calendario': {
         const gcalToken = getGcalToken()

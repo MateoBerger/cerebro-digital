@@ -422,6 +422,33 @@ export async function recordPomodoroBlock(uid, currentStats) {
   return { count, streak }
 }
 
+// ── MENSAJE DIARIO PROACTIVO ──────────────────────────────
+// users/{uid}/daily-message/{YYYY-MM-DD} → { text, date, createdAt, source }
+// Lo genera el cron (check-reminders.js) ~7:30am hora Chile vía Cerebras.
+
+export function subscribeDailyMessage(uid, date, callback) {
+  return onSnapshot(doc(db, 'users', uid, 'daily-message', date), snap => {
+    callback(snap.exists() ? snap.data() : null)
+  })
+}
+
+// ── ESTADO DEL DÍA (check-in conversacional) ──────────────
+// users/{uid}/daily-state/{YYYY-MM-DD} → { resumen, nivel, updatedAt }
+// Se llena cuando el asistente detecta en el chat cómo viene Mateo —
+// reemplaza la dependencia del check-in de sliders (que sigue disponible).
+
+export function subscribeDailyState(uid, date, callback) {
+  return onSnapshot(doc(db, 'users', uid, 'daily-state', date), snap => {
+    callback(snap.exists() ? snap.data() : null)
+  })
+}
+
+export async function saveDailyState(uid, date, { resumen, nivel }) {
+  await setDoc(doc(db, 'users', uid, 'daily-state', date), {
+    resumen, nivel, updatedAt: serverTimestamp(),
+  }, { merge: true })
+}
+
 // ── TASK LABELS ───────────────────────────────────────────────────────────────
 // users/{uid}/settings/task-labels → { labels: [{id, name, color}] }
 

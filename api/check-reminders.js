@@ -75,6 +75,22 @@ function chileTomorrow(now) {
   return fmtDate(d)
 }
 
+function chileYesterday(now) {
+  const d = new Date(now)
+  d.setDate(d.getDate() - 1)
+  return fmtDate(d)
+}
+
+// Lunes de la semana actual — misma convención que getWeekKey() en el frontend,
+// usada para filtrar bloques de calendario no recurrentes por semana.
+function chileWeekKey(now) {
+  const d   = new Date(now)
+  const day = d.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  d.setDate(d.getDate() + diff)
+  return fmtDate(d)
+}
+
 // Retorna la fecha del domingo de esta semana (o anterior si hoy es lunes madrugada)
 function lastSundayDate(now) {
   const d = new Date(now)
@@ -119,18 +135,143 @@ async function markSent(db, uid, logId) {
 
 // ── Push helper (closure sobre tokens, fetched once) ─────────────
 function makeSendPush(fcm, tokens) {
-  return async function sendPush(title, body) {
+  return async function sendPush(title, body, data) {
     if (tokens.length === 0) return
     await Promise.allSettled(
       tokens.map(token => fcm.send({
         token,
         notification: { title, body },
+        ...(data ? { data } : {}),
         webpush: {
           notification: { icon: '/logo.png', badge: '/logo.png' },
           fcmOptions:   { link: '/' },
         },
       }))
     )
+  }
+}
+
+// ── Mensaje diario proactivo (IA) ─────────────────────────────────
+// Junta contexto real (tareas, calendario, rachas, ayer) y le pide a
+// Cerebras un mensaje corto y humano. Si la IA falla, cae a un mensaje
+// de respaldo armado con los mismos datos (nunca queda sin mensaje).
+
+async function buildDailyMessageContext(db, uid, now) {
+  const today     = chileToday(now)
+  const yesterday = chileYesterday(now)
+  const dow       = now.getDay()
+  const todayDia  = dow === 0 ? 6 : dow - 1 // 0=Lunes…6=Domingo, igual que el frontend
+  const weekKey   = chileWeekKey(now)
+
+  const [tareasSnap, bloquesSnap, gymSnap, streakSnap, pomoSnap, goalsCfgSnap, goalsYestSnap] = await Promise.all([
+    db.collection('users').doc(uid).collection('tareas').get(),
+    db.collection('users').doc(uid).collection('bloques').get(),
+    db.collection('users').doc(uid).collection('gym-data').doc('stats').get(),
+    db.collection('users').doc(uid).collection('settings').doc('day-complete-streak').get(),
+    db.collection('users').doc(uid).collection('pomodoro-data').doc('stats').get(),
+    db.collection('users').doc(uid).collection('settings').doc('daily-goals').get(),
+    db.collection('users').doc(uid).collection('daily-goals').doc(yesterday).get(),
+  ])
+
+  const tareas      = tareasSnap.docs.map(d => d.data())
+  const pendientes  = tareas.filter(t => !t.completada)
+  const vencidas    = pendientes.filter(t => t.fecha && t.fecha < today)
+  const hoyTareas   = pendientes.filter(t => t.fecha === today)
+  const altaPrio    = pendientes.filter(t => t.prioridad === 'alta')
+
+  const bloquesHoy = bloquesSnap.docs
+    .map(d => d.data())
+    .filter(b => b.dia === todayDia && (!b.semana || b.semana === weekKey))
+    .sort((a, b) => (a.horaInicio || '').localeCompare(b.horaInicio || ''))
+
+  const gymStreak    = gymSnap.exists ? (gymSnap.data().streak || 0) : 0
+  const dayStreak     = streakSnap.exists ? streakSnap.data() : { streak: 0, lastCompleteDate: null }
+  const pomoStreak    = pomoSnap.exists ? (pomoSnap.data().streak || 0) : 0
+
+  const goalItems  = goalsCfgSnap.exists ? (goalsCfgSnap.data().items || []) : []
+  const goalsYest  = goalsYestSnap.exists ? goalsYestSnap.data() : {}
+  const doneYest   = goalItems.filter(g => goalsYest[g.id]).length
+  const totalGoals = goalItems.length
+  const completoAyer = dayStreak.lastCompleteDate === yesterday
+
+  return {
+    today, yesterday,
+    tareasResumen: [
+      vencidas.length ? `${vencidas.length} tarea(s) vencida(s)` : null,
+      hoyTareas.length ? `${hoyTareas.length} tarea(s) vencen hoy: ${hoyTareas.slice(0, 3).map(t => t.titulo).join(', ')}` : null,
+      altaPrio.length ? `${altaPrio.length} tarea(s) de alta prioridad pendiente(s)` : null,
+      !vencidas.length && !hoyTareas.length && !altaPrio.length ? 'sin nada urgente pendiente' : null,
+    ].filter(Boolean).join(' | ') || 'sin tareas pendientes',
+    primeraTareaUrgente: (vencidas[0] || hoyTareas[0] || altaPrio[0])?.titulo || null,
+    calendarioHoy: bloquesHoy.length
+      ? bloquesHoy.map(b => `${b.horaInicio}-${b.horaFin} ${b.titulo}`).join(', ')
+      : 'sin bloques agendados',
+    huecoLibre: bloquesHoy.length <= 1,
+    gymStreak, dayStreak: dayStreak.streak || 0, pomoStreak,
+    completoAyer, doneYest, totalGoals,
+  }
+}
+
+function fallbackDailyMessage(ctx) {
+  const parts = ['Buenos días, Mateo.']
+  if (ctx.primeraTareaUrgente) {
+    parts.push(`Hoy es clave avanzar con "${ctx.primeraTareaUrgente}".`)
+  } else {
+    parts.push('No tenés nada urgente pendiente, buen día para avanzar tranquilo.')
+  }
+  if (ctx.huecoLibre) parts.push('Tenés bastante espacio libre en la agenda, aprovechalo.')
+  if (ctx.completoAyer) parts.push('Ayer cerraste el día completo — seguí así.')
+  parts.push('Aquí ando 💪')
+  return parts.join(' ')
+}
+
+async function generateDailyMessage(ctx) {
+  const key = process.env.CEREBRAS_API_KEY
+  if (!key) return { text: fallbackDailyMessage(ctx), source: 'fallback' }
+
+  const sysPrompt = `Sos el asistente personal de Mateo Berger, estudiante chileno de 4to medio preparando la PAES 2026. Cada mañana le dejás UN mensaje corto y humano antes de que abra la app — no es un chat, es una nota que te vas a comportar como si ya lo conocieras.
+
+Datos reales de hoy (${ctx.today}):
+- Tareas: ${ctx.tareasResumen}
+- Calendario de hoy: ${ctx.calendarioHoy}
+- Racha de gym: ${ctx.gymStreak} día(s) | Racha de días 100% completos: ${ctx.dayStreak} día(s) | Racha de bloques de estudio: ${ctx.pomoStreak} día(s)
+- Ayer: ${ctx.completoAyer ? 'completó todas sus metas diarias' : ctx.totalGoals ? `completó ${ctx.doneYest}/${ctx.totalGoals} metas diarias` : 'sin datos de metas diarias'}
+
+Reglas del mensaje:
+- 2 a 4 frases, corto, directo, en español (vos/tenés, tono chileno-rioplatense natural).
+- Tono de ALIADO cercano, nunca de capataz ni de coach genérico. No uses frases hechas de autoayuda.
+- Basate en los datos reales de arriba — mencioná algo concreto (una tarea, un hueco libre, una racha), no generalidades vacías.
+- Variá el estilo respecto a un mensaje típico: no empieces siempre igual, no repitas estructura de libro de fórmulas.
+- Aproximadamente 1 de cada 3 veces (a tu criterio, con naturalidad), cerrá con una pregunta breve y genuina sobre cómo viene el día o algo puntual. El resto de las veces no preguntes nada, solo cerrá con una frase corta de aliento o un emoji suelto (nunca abuses de emojis, como mucho uno).
+- Nunca uses saludo tipo "¡Buenos días!" con signos de exclamación exagerados. Ejemplo de tono (no lo copies literal): "Buenos días, Mateo. Hoy lo importante es la guía de física atrasada. Tenés la tarde libre, aprovechala. Aquí ando 💪"
+- Devolvé SOLO el mensaje final, sin comillas, sin markdown, sin explicaciones.`
+
+  try {
+    const controller = new AbortController()
+    const timeout    = setTimeout(() => controller.abort(), 7000)
+    const res = await fetch('https://api.cerebras.ai/v1/chat/completions', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({
+        model:       'gpt-oss-120b',
+        max_tokens:  220,
+        temperature: 0.9,
+        messages: [
+          { role: 'system', content: sysPrompt },
+          { role: 'user',   content: 'Escribí el mensaje de hoy.' },
+        ],
+      }),
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeout))
+
+    if (!res.ok) throw new Error(`provider status ${res.status}`)
+    const data = await res.json()
+    const text = data.choices?.[0]?.message?.content?.trim()
+    if (!text) throw new Error('respuesta vacía')
+    return { text, source: 'ai' }
+  } catch (err) {
+    console.error('[check-reminders] daily message IA falló, usando fallback:', err.message)
+    return { text: fallbackDailyMessage(ctx), source: 'fallback' }
   }
 }
 
@@ -160,6 +301,24 @@ export default async function handler(req, res) {
     const tokensSnap = await db.collection('users').doc(uid).collection('tokens').get()
     const tokens     = tokensSnap.docs.map(d => d.data().token).filter(Boolean)
     const sendPush   = makeSendPush(fcm, tokens)
+
+    // ── REGLA 0: Mensaje diario proactivo (IA, ~7:30am) ────────
+    if (inWindow(now, 7, 30, 30)) {
+      const logId = `daily_message_${today}`
+      if (!(await alreadySent(db, uid, logId))) {
+        const dailyCtx = await buildDailyMessageContext(db, uid, now)
+        const { text, source } = await generateDailyMessage(dailyCtx)
+
+        await db.collection('users').doc(uid).collection('daily-message').doc(today).set({
+          text, date: today, source, createdAt: new Date().toISOString(),
+        })
+
+        const pushBody = text.length > 160 ? text.slice(0, 157) + '…' : text
+        await sendPush('☀️ Tu asistente te dejó un mensaje', pushBody, { type: 'daily_message' })
+        await markSent(db, uid, logId)
+        sent.push(logId)
+      }
+    }
 
     // ── REGLA 4: Hábitos diarios ──────────────────────────────
     const goalsSnap = await db.collection('users').doc(uid).collection('daily-goals').doc(today).get()

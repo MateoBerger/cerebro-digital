@@ -166,6 +166,21 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'set_estado_dia',
+      description: 'Guarda cómo viene Mateo hoy (energía, ánimo, disposición), inferido de la conversación en lenguaje natural — NO es un formulario ni una escala. Llamala en cuanto Mateo cuente cómo se siente o cómo viene el día (ej: "ando cansado", "dormí mal", "vengo con todo", "tengo poco tiempo hoy"), sin pedirle permiso ni confirmación.',
+      parameters: {
+        type: 'object',
+        properties: {
+          resumen: { type: 'string', description: 'Resumen corto (máx 12 palabras), en tono natural. Ej: "cansado, durmió poco pero con ganas de avanzar"' },
+          nivel:   { type: 'string', enum: ['bajo', 'medio', 'alto'], description: 'Nivel general de energía/disposición, para ajustar cuán exigentes son las sugerencias del resto del día' },
+        },
+        required: ['resumen', 'nivel'],
+      },
+    },
+  },
 ]
 
 // ── Conversión mensajes frontend → formato OpenAI-compatible ───
@@ -240,7 +255,10 @@ Referencia completa: 0=Lunes 1=Martes 2=Miércoles 3=Jueves 4=Viernes 5=Sábado 
 
 # DATOS DEL SISTEMA
 
-## Check-in de hoy
+## Cómo viene Mateo hoy (conversacional — tu fuente principal)
+${ctx.estado_dia}
+
+## Check-in de sliders de hoy (secundario, solo si lo llenó)
 ${ctx.checkin}
 
 ## Tareas pendientes
@@ -297,6 +315,9 @@ Usá las herramientas ÚNICAMENTE cuando el mensaje contenga una intención clar
 - Verbos de acción directos: "agregá", "creá", "anotá", "poneme", "marcá", "completá", "agendá"
 - Pedidos explícitos: "necesito que crees...", "¿podés agregar...?", "agregame una tarea de..."
 - Modificaciones concretas: "completá la tarea de X", "moveme el bloque de..."
+
+## Excepción: estado del día (implícito, sin pedir permiso)
+No dependas del check-in de sliders para saber cómo viene Mateo — preguntáselo vos, conversando, cuando haga falta (por ejemplo si te pide ayuda para organizar el día y no tenés ningún estado registrado). Y al revés: en cuanto Mateo cuente cómo se siente o cómo viene ("ando cansado", "dormí mal", "hoy vengo con todo", "tengo poco tiempo"), llamá set_estado_dia enseguida con un resumen corto y un nivel — no le pidas confirmación, es solo tomar nota. Después seguí la charla con naturalidad. Usá ese estado (o el check-in si no hay estado conversacional) para calibrar tus sugerencias: más liviano y con menos exigencia si el nivel es bajo, más ambicioso si es alto.
 
 ## REGLA CRÍTICA — Múltiples acciones en un mismo mensaje
 Cuando Mateo pide N acciones, tu respuesta DEBE incluir N tool calls, uno por acción, TODOS en la MISMA respuesta. NUNCA ejecutes solo la primera.

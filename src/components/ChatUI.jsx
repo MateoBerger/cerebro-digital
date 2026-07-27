@@ -199,6 +199,14 @@ function ChatMessage({ msg, shouldStream, onStreamEnd }) {
       {!isUser && <AssistantAvatar pulsing={false} size={26} />}
 
       <div style={{ maxWidth: '80%', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+        {msg.isDaily && (
+          <span style={{
+            fontSize: '10px', fontWeight: 700, color: 'var(--accent)',
+            letterSpacing: '.6px', textTransform: 'uppercase', paddingLeft: '2px',
+          }}>
+            ☀️ Tu mensaje del día
+          </span>
+        )}
         {/* Burbuja */}
         <div style={{
           padding: '10px 14px',
@@ -209,10 +217,10 @@ function ChatMessage({ msg, shouldStream, onStreamEnd }) {
           color: isUser ? '#1a1608' : msg.isError ? '#f07272' : 'var(--text0)',
           border: isUser
             ? 'none'
-            : `1px solid ${msg.isError ? 'rgba(240,114,114,.22)' : 'rgba(224,189,107,.18)'}`,
+            : `1px solid ${msg.isError ? 'rgba(240,114,114,.22)' : msg.isDaily ? 'rgba(224,189,107,.4)' : 'rgba(224,189,107,.18)'}`,
           boxShadow: isUser
             ? '0 2px 10px rgba(224,189,107,.28)'
-            : msg.isError ? 'none' : '0 0 14px rgba(224,189,107,.06)',
+            : msg.isError ? 'none' : msg.isDaily ? '0 0 20px rgba(224,189,107,.14)' : '0 0 14px rgba(224,189,107,.06)',
           fontSize: '14px', lineHeight: 1.55,
           whiteSpace:  isUser ? 'pre-wrap' : undefined,
           wordBreak:   'break-word',
