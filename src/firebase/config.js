@@ -27,3 +27,5 @@ export const auth = initializeAuth(app, {
 export const db = getFirestore(app)
 export const googleProvider = new GoogleAuthProvider()
 googleProvider.addScope('https://www.googleapis.com/auth/calendar')
+// Solo lectura — nunca enviar, borrar ni modificar correos.
+googleProvider.addScope('https://www.googleapis.com/auth/gmail.readonly')

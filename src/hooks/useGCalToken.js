@@ -26,6 +26,13 @@ function clearStoredToken() {
   sessionStorage.removeItem(EXPIRY_KEY)
 }
 
+// Scopes pedidos en un solo popup — el mismo token sirve para Calendar y para
+// leer Gmail (solo lectura: nunca enviar, borrar ni modificar correos).
+const SCOPES = [
+  'https://www.googleapis.com/auth/calendar',
+  'https://www.googleapis.com/auth/gmail.readonly',
+].join(' ')
+
 // Conexión/reconexión — siempre iniciada por clic del usuario, NUNCA automáticamente.
 // GIS abre un popup OAuth; onToken se llama con el access_token si el usuario autoriza.
 export function requestCalendarAccess(onToken, onError) {
@@ -39,7 +46,7 @@ export function requestCalendarAccess(onToken, onError) {
 
   const client = gis.initTokenClient({
     client_id: GCAL_CLIENT_ID,
-    scope:     'https://www.googleapis.com/auth/calendar',
+    scope:     SCOPES,
     callback: (resp) => {
       console.log('[GCal] callback recibido:', JSON.stringify(resp))
       if (resp.error || !resp.access_token) {
