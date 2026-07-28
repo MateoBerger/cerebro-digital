@@ -29,3 +29,10 @@ export const googleProvider = new GoogleAuthProvider()
 googleProvider.addScope('https://www.googleapis.com/auth/calendar')
 // Solo lectura — nunca enviar, borrar ni modificar correos.
 googleProvider.addScope('https://www.googleapis.com/auth/gmail.readonly')
+// Sin esto, si el navegador ya tenía una sesión/consentimiento previo con
+// Google, signInWithPopup puede reusarlo en silencio y devolver un token
+// que sigue sin incluir un scope agregado recién (nunca llega a mostrarse
+// la pantalla de permisos para el scope nuevo). 'consent' fuerza que Google
+// siempre la muestre, así el usuario aprueba explícitamente cualquier scope
+// que todavía no haya aceptado.
+googleProvider.setCustomParameters({ prompt: 'consent' })

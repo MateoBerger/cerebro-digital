@@ -67,7 +67,11 @@ export function requestCalendarAccess(onToken, onError) {
     },
   })
   console.log('[GCal] requestAccessToken → abriendo popup OAuth')
-  client.requestAccessToken()
+  // prompt:'consent' fuerza la pantalla de permisos completa en vez de dejar
+  // que Google reuse en silencio un consentimiento previo — mismo motivo que
+  // en firebase/config.js: es lo que garantiza que un scope agregado recién
+  // (como gmail.readonly) quede realmente aprobado y no solo "pedido".
+  client.requestAccessToken({ prompt: 'consent' })
 }
 
 export function useGCalToken() {
