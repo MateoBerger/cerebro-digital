@@ -38,11 +38,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 .area-card.area-fis{background:linear-gradient(155deg,var(--glow),var(--surface));border-color:var(--accent);}
 .area-card.area-qui{background:linear-gradient(155deg,rgba(45,204,126,.12),var(--surface));border-color:rgba(45,204,126,.35);}
 .area-card.area-bio{background:linear-gradient(155deg,rgba(255,107,79,.12),var(--surface));border-color:rgba(255,107,79,.35);}
+.area-card.area-lec{background:linear-gradient(155deg,rgba(124,79,255,.12),var(--surface));border-color:rgba(124,79,255,.35);}
+.area-card.area-m1{background:linear-gradient(155deg,rgba(255,204,79,.12),var(--surface));border-color:rgba(255,204,79,.35);}
+.area-card.area-m2{background:linear-gradient(155deg,rgba(255,79,107,.12),var(--surface));border-color:rgba(255,79,107,.35);}
 .area-badge{position:absolute;top:12px;right:12px;font-size:10px;background:var(--accent);color:#fff;padding:3px 9px;border-radius:100px;font-weight:700;letter-spacing:.3px;}
 .area-placeholder{text-align:center;padding:70px 20px;color:var(--text2);}
 .area-placeholder .ap-icon{font-size:52px;margin-bottom:18px;}
 .area-placeholder h2{font-family:var(--font-head);font-size:24px;color:var(--text);margin-bottom:8px;}
-.page{display:none;padding:28px 32px;flex:1;max-width:1100px;}
+.page{display:none;padding:28px 32px;flex:1;width:100%;max-width:1100px;margin:0 auto;}
 .page.active{display:block;}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;transition:border-color .2s;}
 .card:hover{border-color:var(--accent);}
@@ -302,6 +305,34 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
       <div class="stat-card stat-purple"><div class="stat-num" id="hs-essays">0</div><div class="stat-lbl">Ensayos</div></div>
       <div class="stat-card stat-red"><div class="stat-num" id="hs-errors">0</div><div class="stat-lbl">Pendientes</div></div>
     </div>
+    <h3 style="font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:14px">Áreas de Estudio</h3>
+    <div class="areas-grid" style="margin-bottom:28px">
+      <div class="area-card area-fis" onclick="navigate('fisica')">
+        <span class="area-badge">Mención</span>
+        <div class="qa-icon">🔬</div>
+        <div><div class="area-name">Física</div><div class="area-meta">Contenido próximamente</div></div>
+      </div>
+      <div class="area-card area-qui" onclick="navigate('quimica')">
+        <div class="qa-icon">🧪</div>
+        <div><div class="area-name">Química</div><div class="area-meta">Contenido próximamente</div></div>
+      </div>
+      <div class="area-card area-bio" onclick="navigate('biologia')">
+        <div class="qa-icon">🧬</div>
+        <div><div class="area-name">Biología</div><div class="area-meta">Contenido próximamente</div></div>
+      </div>
+      <div class="area-card area-lec" onclick="navigate('lectora')">
+        <div class="qa-icon">📖</div>
+        <div><div class="area-name">Competencia Lectora</div><div class="area-meta">Contenido próximamente</div></div>
+      </div>
+      <div class="area-card area-m1" onclick="navigate('m1')">
+        <div class="qa-icon">🔢</div>
+        <div><div class="area-name">M1</div><div class="area-meta">Contenido próximamente</div></div>
+      </div>
+      <div class="area-card area-m2" onclick="navigate('m2')">
+        <div class="qa-icon">📐</div>
+        <div><div class="area-name">M2</div><div class="area-meta">Contenido próximamente</div></div>
+      </div>
+    </div>
     <div class="home-grid">
       <div class="quick-action" onclick="navigate('guides')"><div class="qa-icon">📚</div><div class="qa-title">Guías de Estudio</div><div class="qa-desc">Teoría + 15 ejercicios por tema</div></div>
       <div class="quick-action" onclick="navigate('vocab')"><div class="qa-icon">🔤</div><div class="qa-title">Vocabulario del Día</div><div class="qa-desc">Aprende una palabra nueva hoy</div></div>
@@ -321,7 +352,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 
   <!-- AREAS HUB -->
   <section class="page" id="page-areas">
-    <div class="section-header"><h2>Áreas de Estudio</h2><p>Contenido por asignatura de mención. Física, Química y Biología (próximamente).</p></div>
+    <div class="section-header"><h2>Áreas de Estudio</h2><p>Contenido por asignatura. Física es mención; el resto próximamente.</p></div>
     <div class="areas-grid">
       <div class="area-card area-fis" onclick="navigate('fisica')">
         <span class="area-badge">Mención</span>
@@ -335,6 +366,18 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
       <div class="area-card area-bio" onclick="navigate('biologia')">
         <div class="qa-icon">🧬</div>
         <div><div class="area-name">Biología</div><div class="area-meta">Contenido próximamente</div></div>
+      </div>
+      <div class="area-card area-lec" onclick="navigate('lectora')">
+        <div class="qa-icon">📖</div>
+        <div><div class="area-name">Competencia Lectora</div><div class="area-meta">Contenido próximamente</div></div>
+      </div>
+      <div class="area-card area-m1" onclick="navigate('m1')">
+        <div class="qa-icon">🔢</div>
+        <div><div class="area-name">M1</div><div class="area-meta">Contenido próximamente</div></div>
+      </div>
+      <div class="area-card area-m2" onclick="navigate('m2')">
+        <div class="qa-icon">📐</div>
+        <div><div class="area-name">M2</div><div class="area-meta">Contenido próximamente</div></div>
       </div>
     </div>
   </section>
@@ -365,6 +408,36 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
     <div class="area-placeholder">
       <div class="ap-icon">🧬</div>
       <h2>Biología</h2>
+      <p>Contenido próximamente</p>
+    </div>
+  </section>
+
+  <!-- COMPETENCIA LECTORA (placeholder) -->
+  <section class="page" id="page-lectora">
+    <div class="breadcrumb"><a onclick="navigate('areas')">Áreas</a> › <span>Competencia Lectora</span></div>
+    <div class="area-placeholder">
+      <div class="ap-icon">📖</div>
+      <h2>Competencia Lectora</h2>
+      <p>Contenido próximamente</p>
+    </div>
+  </section>
+
+  <!-- M1 (placeholder) -->
+  <section class="page" id="page-m1">
+    <div class="breadcrumb"><a onclick="navigate('areas')">Áreas</a> › <span>M1</span></div>
+    <div class="area-placeholder">
+      <div class="ap-icon">🔢</div>
+      <h2>Matemática M1</h2>
+      <p>Contenido próximamente</p>
+    </div>
+  </section>
+
+  <!-- M2 (placeholder) -->
+  <section class="page" id="page-m2">
+    <div class="breadcrumb"><a onclick="navigate('areas')">Áreas</a> › <span>M2</span></div>
+    <div class="area-placeholder">
+      <div class="ap-icon">📐</div>
+      <h2>Matemática M2</h2>
       <p>Contenido próximamente</p>
     </div>
   </section>
@@ -1212,7 +1285,7 @@ function updateStreak(){
 }
 
 const PILL_MAP={home:'home',progress:'home',
-  areas:'areas',fisica:'areas',quimica:'areas',biologia:'areas',
+  areas:'areas',fisica:'areas',quimica:'areas',biologia:'areas',lectora:'areas',m1:'areas',m2:'areas',
   'practicar-hub':'practicar-hub',practice:'practicar-hub',errors:'practicar-hub',essays:'practicar-hub',tutor:'practicar-hub','essay-active':'practicar-hub',
   'misensayos-hub':'misensayos-hub',registro:'misensayos-hub','subir-ensayo':'misensayos-hub',
   'habilidades-hub':'habilidades-hub',vocab:'habilidades-hub',wordbank:'habilidades-hub',guides:'habilidades-hub','guide-detail':'habilidades-hub',mathTips:'habilidades-hub',
@@ -1230,7 +1303,7 @@ function navigate(page){
   const navEl=document.querySelector(`.nav-item[onclick="navigate('${page}')"]`);
   if(navEl)navEl.classList.add('active');
   setActivePill(PILL_MAP[page]||'');
-  const titles={home:'Inicio',tutor:'Tutor IA',guides:'Guías',practice:'Práctica Rápida',errors:'Practicar Errores',vocab:'Vocabulario',wordbank:'Banco de Palabras',mathTips:'Tips Matemáticas',dato:'Dato del Día',essays:'Ensayos',registro:'Mis Ensayos','subir-ensayo':'Subir Ensayo',progress:'Mi Progreso',books:'Mis Libros',upload:'Subir Guía',download:'Descargar PDF',admin:'Panel Admin','guide-detail':'Guías',areas:'Áreas de Estudio',fisica:'Física',quimica:'Química',biologia:'Biología','practicar-hub':'Practicar','misensayos-hub':'Mis Ensayos','habilidades-hub':'Habilidades','material-hub':'Material'};
+  const titles={home:'Inicio',tutor:'Tutor IA',guides:'Guías',practice:'Práctica Rápida',errors:'Practicar Errores',vocab:'Vocabulario',wordbank:'Banco de Palabras',mathTips:'Tips Matemáticas',dato:'Dato del Día',essays:'Ensayos',registro:'Mis Ensayos','subir-ensayo':'Subir Ensayo',progress:'Mi Progreso',books:'Mis Libros',upload:'Subir Guía',download:'Descargar PDF',admin:'Panel Admin','guide-detail':'Guías',areas:'Áreas de Estudio',fisica:'Física',quimica:'Química',biologia:'Biología',lectora:'Competencia Lectora',m1:'Matemática M1',m2:'Matemática M2','practicar-hub':'Practicar','misensayos-hub':'Mis Ensayos','habilidades-hub':'Habilidades','material-hub':'Material'};
   document.getElementById('topbarTitle').textContent=titles[page]||page;
   if(page==='home')renderHome();
   if(page==='tutor')renderTutor();
