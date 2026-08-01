@@ -9,29 +9,39 @@
 :root{--bg:#0a0c10;--surface:#13161d;--surface2:#1a1e28;--border:#252a38;--accent:#4f7cff;--accent2:#7c4fff;--accent3:#ff6b4f;--green:#2dcc7e;--red:#ff4f6b;--yellow:#ffcc4f;--text:#e8eaf2;--text2:#8891a8;--text3:#4a5268;--glow:rgba(79,124,255,0.15);--radius:14px;--radius-sm:8px;--font-head:'Syne',sans-serif;--font-body:'DM Sans',sans-serif;}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:15px;line-height:1.6;min-height:100vh;display:flex;overflow-x:hidden;}
-.sidebar{width:240px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;left:0;top:0;bottom:0;z-index:100;transition:transform .3s ease;}
-.sidebar-logo{padding:24px 24px 16px;border-bottom:1px solid var(--border);}
-.sidebar-logo h1{font-family:var(--font-head);font-size:22px;font-weight:800;letter-spacing:-0.5px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
-.sidebar-logo p{font-size:11px;color:var(--text3);margin-top:2px;font-weight:500;letter-spacing:1px;text-transform:uppercase;}
 .byline{font-size:11px;color:var(--accent2);margin-top:5px;font-weight:600;letter-spacing:.5px;-webkit-text-fill-color:var(--accent2);}
-.streak-bar{margin:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;display:flex;align-items:center;gap:10px;}
-.streak-icon{font-size:22px;}.streak-info{flex:1;}
-.streak-info .s-num{font-family:var(--font-head);font-size:18px;font-weight:700;color:var(--yellow);}
-.streak-info .s-lbl{font-size:11px;color:var(--text3);}
-nav{padding:8px 0;flex:1;overflow-y:auto;}
-.nav-section{padding:12px 16px 4px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);font-weight:600;}
-.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;color:var(--text2);cursor:pointer;transition:all .2s;font-size:14px;font-weight:400;border-left:3px solid transparent;}
-.nav-item:hover{background:var(--surface2);color:var(--text);}
-.nav-item.active{background:var(--glow);color:var(--accent);border-left-color:var(--accent);font-weight:500;}
-.nav-icon{width:18px;text-align:center;font-size:16px;}
-.sidebar-footer{padding:16px;border-top:1px solid var(--border);}
-.user-pill{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border-radius:var(--radius-sm);cursor:pointer;}
-.avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;}
+.user-pill{display:flex;align-items:center;gap:10px;padding:7px 10px;background:var(--surface2);border-radius:var(--radius-sm);cursor:pointer;}
+.avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
 .user-name{font-size:13px;font-weight:500;}
-.main{margin-left:240px;flex:1;min-height:100vh;display:flex;flex-direction:column;}
-.topbar{padding:18px 32px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface);position:sticky;top:0;z-index:50;}
-.topbar-title{font-family:var(--font-head);font-size:18px;font-weight:700;}
-.topbar-actions{display:flex;gap:10px;align-items:center;}
+.main{margin-left:0;flex:1;min-height:100vh;display:flex;flex-direction:column;}
+.app-header{position:sticky;top:0;z-index:50;background:var(--surface);border-bottom:1px solid var(--border);}
+.topbar{padding:16px 32px 10px;display:flex;align-items:center;justify-content:space-between;gap:14px;}
+.tb-left{display:flex;align-items:center;gap:12px;min-width:0;}
+.tb-logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-weight:800;color:#fff;font-size:16px;flex-shrink:0;}
+.tb-titles{min-width:0;}
+.tb-title{font-family:var(--font-head);font-size:18px;font-weight:800;letter-spacing:-.3px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.2;}
+.topbar-subtitle{font-size:11px;color:var(--text3);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.topbar-actions{display:flex;gap:10px;align-items:center;flex-shrink:0;}
+.streak-pill{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:100px;padding:6px 12px;font-size:13px;font-weight:700;color:var(--yellow);white-space:nowrap;}
+.streak-pill .streak-icon{font-size:15px;}
+.navpills{display:flex;gap:8px;overflow-x:auto;padding:0 32px 14px;scrollbar-width:none;}
+.navpills::-webkit-scrollbar{display:none;}
+.pill{flex-shrink:0;padding:8px 16px;border-radius:20px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .2s;}
+.pill:hover{border-color:var(--accent);color:var(--text);}
+.pill.on{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent;box-shadow:0 4px 14px -4px var(--glow);}
+.areas-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+.area-card{position:relative;border-radius:var(--radius);padding:20px 16px;cursor:pointer;border:1px solid var(--border);min-height:130px;display:flex;flex-direction:column;justify-content:space-between;transition:all .2s;background:var(--surface);}
+.area-card:hover{transform:translateY(-3px);}
+.area-card .qa-icon{font-size:30px;}
+.area-card .area-name{font-family:var(--font-head);font-size:16px;font-weight:700;margin-top:8px;}
+.area-card .area-meta{font-size:12px;color:var(--text2);margin-top:3px;}
+.area-card.area-fis{background:linear-gradient(155deg,var(--glow),var(--surface));border-color:var(--accent);}
+.area-card.area-qui{background:linear-gradient(155deg,rgba(45,204,126,.12),var(--surface));border-color:rgba(45,204,126,.35);}
+.area-card.area-bio{background:linear-gradient(155deg,rgba(255,107,79,.12),var(--surface));border-color:rgba(255,107,79,.35);}
+.area-badge{position:absolute;top:12px;right:12px;font-size:10px;background:var(--accent);color:#fff;padding:3px 9px;border-radius:100px;font-weight:700;letter-spacing:.3px;}
+.area-placeholder{text-align:center;padding:70px 20px;color:var(--text2);}
+.area-placeholder .ap-icon{font-size:52px;margin-bottom:18px;}
+.area-placeholder h2{font-family:var(--font-head);font-size:24px;color:var(--text);margin-bottom:8px;}
 .page{display:none;padding:28px 32px;flex:1;max-width:1100px;}
 .page.active{display:block;}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;transition:border-color .2s;}
@@ -183,7 +193,7 @@ nav{padding:8px 0;flex:1;overflow-y:auto;}
 ::-webkit-scrollbar{width:6px;}::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 ::-webkit-scrollbar-thumb:hover{background:var(--text3);}
-@media(max-width:768px){.sidebar{transform:translateX(-100%);}.sidebar.open{transform:translateX(0);}.main{margin-left:0;}.home-grid{grid-template-columns:1fr;}.essay-layout{grid-template-columns:1fr;}.page{padding:20px 16px;}}
+@media(max-width:768px){.home-grid{grid-template-columns:1fr;}.essay-layout{grid-template-columns:1fr;}.page{padding:20px 16px;}.areas-grid{grid-template-columns:1fr;}.topbar{padding:14px 16px 8px;}.navpills{padding:0 16px 12px;}.user-name{display:none;}}
 .divider{border:none;border-top:1px solid var(--border);margin:24px 0;}
 .w-full{width:100%;}.hidden{display:none!important;}
 .book-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;transition:border-color .2s;}
@@ -246,61 +256,33 @@ nav{padding:8px 0;flex:1;overflow-y:auto;}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 </head>
 <body>
-<aside class="sidebar" id="sidebar">
-  <div class="sidebar-logo">
-    <h1>PAES·PRO</h1>
-    <p>Plataforma de Estudio</p>
-    <div class="byline">✦ By Mateo Berger</div>
-  </div>
-  <div class="streak-bar">
-    <span class="streak-icon">🔥</span>
-    <div class="streak-info">
-      <div class="s-num" id="streakCount">0</div>
-      <div class="s-lbl">días de racha</div>
-    </div>
-  </div>
-  <nav>
-    <div class="nav-section">Principal</div>
-    <div class="nav-item active" onclick="navigate('home')"><span class="nav-icon">🏠</span>Inicio</div>
-    <div class="nav-item" onclick="navigate('progress')"><span class="nav-icon">📊</span>Mi Progreso</div>
-    <div class="nav-item" onclick="navigate('dato')"><span class="nav-icon">🧠</span>Dato del Día</div>
-    <div class="nav-section">Estudio</div>
-    <div class="nav-item" onclick="navigate('tutor')"><span class="nav-icon">🤖</span>Tutor IA</div>
-    <div class="nav-item" onclick="navigate('guides')"><span class="nav-icon">📚</span>Guías de Estudio</div>
-    <div class="nav-item" onclick="navigate('practice')"><span class="nav-icon">✏️</span>Práctica Rápida</div>
-    <div class="nav-item" onclick="navigate('errors')"><span class="nav-icon">🎯</span>Practicar Errores</div>
-    <div class="nav-section">Habilidades</div>
-    <div class="nav-item" onclick="navigate('vocab')"><span class="nav-icon">📖</span>Vocabulario PAES</div>
-    <div class="nav-item" onclick="navigate('wordbank')"><span class="nav-icon">🔍</span>Banco de Palabras</div>
-    <div class="nav-item" onclick="navigate('mathTips')"><span class="nav-icon">💡</span>Tips Matemáticas</div>
-    <div class="nav-section">Evaluación</div>
-    <div class="nav-item" onclick="navigate('essays')"><span class="nav-icon">📝</span>Ensayos</div>
-    <div class="nav-item" onclick="navigate('registro')"><span class="nav-icon">📋</span>Mis Ensayos</div>
-    <div class="nav-item" onclick="navigate('subir-ensayo')"><span class="nav-icon">📥</span>Subir Ensayo</div>
-    <div class="nav-item" onclick="navigate('upload')"><span class="nav-icon">📤</span>Subir Guía</div>
-    <div class="nav-item" onclick="navigate('download')"><span class="nav-icon">⬇️</span>Descargar PDF</div>
-    <div class="nav-section">Personal</div>
-    <div class="nav-item" onclick="navigate('books')"><span class="nav-icon">📕</span>Mis Libros</div>
-    <div class="nav-item admin-only hidden" onclick="navigate('admin')" id="adminNavItem"><span class="nav-icon">👑</span>Admin</div>
-  </nav>
-  <div class="sidebar-footer">
-    <div class="user-pill" onclick="promptUserName()">
-      <div class="avatar" id="avatarInitial">E</div>
-      <div class="user-name" id="userName">Estudiante</div>
-    </div>
-  </div>
-</aside>
-
 <main class="main">
-  <header class="topbar">
-    <div style="display:flex;align-items:center;gap:14px">
-      <button style="display:none;background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer" id="menuBtn" onclick="toggleSidebar()">☰</button>
-      <span class="topbar-title" id="topbarTitle">Inicio</span>
+  <div class="app-header">
+    <header class="topbar">
+      <div class="tb-left">
+        <div class="tb-logo">P</div>
+        <div class="tb-titles">
+          <div class="tb-title">PAES</div>
+          <span class="topbar-subtitle" id="topbarTitle">Inicio</span>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <div class="streak-pill"><span class="streak-icon">🔥</span><span id="streakCount">0</span> días</div>
+        <div class="user-pill" onclick="promptUserName()">
+          <div class="avatar" id="avatarInitial">E</div>
+          <div class="user-name" id="userName">Estudiante</div>
+        </div>
+      </div>
+    </header>
+    <div class="navpills" id="navPills">
+      <div class="pill on" data-hub="home" onclick="navigate('home')">🏠 Inicio</div>
+      <div class="pill" data-hub="areas" onclick="navigate('areas')">🔭 Áreas</div>
+      <div class="pill" data-hub="practicar-hub" onclick="navigate('practicar-hub')">✏️ Practicar</div>
+      <div class="pill" data-hub="misensayos-hub" onclick="navigate('misensayos-hub')">📋 Mis Ensayos</div>
+      <div class="pill" data-hub="habilidades-hub" onclick="navigate('habilidades-hub')">📖 Habilidades</div>
+      <div class="pill" data-hub="material-hub" onclick="navigate('material-hub')">📤 Material</div>
     </div>
-    <div class="topbar-actions">
-      <button class="btn btn-primary btn-sm" onclick="navigate('vocab')">🔥 Racha</button>
-    </div>
-  </header>
+  </div>
 
   <!-- HOME -->
   <section class="page active" id="page-home">
@@ -325,10 +307,107 @@ nav{padding:8px 0;flex:1;overflow-y:auto;}
       <div class="quick-action" onclick="navigate('vocab')"><div class="qa-icon">🔤</div><div class="qa-title">Vocabulario del Día</div><div class="qa-desc">Aprende una palabra nueva hoy</div></div>
       <div class="quick-action" onclick="navigate('essays')"><div class="qa-icon">📋</div><div class="qa-title">Ensayos PAES</div><div class="qa-desc">Mini ensayos y ensayos completos</div></div>
       <div class="quick-action" onclick="navigate('errors')"><div class="qa-icon">🎯</div><div class="qa-title">Reforzar Errores</div><div class="qa-desc">Practica tus áreas débiles</div></div>
+      <div class="quick-action" onclick="navigate('progress')"><div class="qa-icon">📊</div><div class="qa-title">Mi Progreso</div><div class="qa-desc">Estadísticas de tu desempeño</div></div>
+      <div class="quick-action" onclick="navigate('dato')"><div class="qa-icon">🧠</div><div class="qa-title">Dato del Día</div><div class="qa-desc">Curiosidad de hoy sobre la PAES</div></div>
     </div>
     <div class="recent-section">
       <h3>Actividad Reciente</h3>
       <div id="recentActivity"><p style="color:var(--text3);font-size:13px">Aún no hay actividad. ¡Empieza practicando!</p></div>
+    </div>
+    <div class="quick-action admin-only hidden" id="adminNavItem" onclick="navigate('admin')" style="margin-top:20px;max-width:260px">
+      <div class="qa-icon">👑</div><div class="qa-title">Panel Admin</div><div class="qa-desc">Estadísticas globales</div>
+    </div>
+  </section>
+
+  <!-- AREAS HUB -->
+  <section class="page" id="page-areas">
+    <div class="section-header"><h2>Áreas de Estudio</h2><p>Contenido por asignatura de mención. Física, Química y Biología (próximamente).</p></div>
+    <div class="areas-grid">
+      <div class="area-card area-fis" onclick="navigate('fisica')">
+        <span class="area-badge">Mención</span>
+        <div class="qa-icon">🔬</div>
+        <div><div class="area-name">Física</div><div class="area-meta">Contenido próximamente</div></div>
+      </div>
+      <div class="area-card area-qui" onclick="navigate('quimica')">
+        <div class="qa-icon">🧪</div>
+        <div><div class="area-name">Química</div><div class="area-meta">Contenido próximamente</div></div>
+      </div>
+      <div class="area-card area-bio" onclick="navigate('biologia')">
+        <div class="qa-icon">🧬</div>
+        <div><div class="area-name">Biología</div><div class="area-meta">Contenido próximamente</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FISICA (placeholder) -->
+  <section class="page" id="page-fisica">
+    <div class="breadcrumb"><a onclick="navigate('areas')">Áreas</a> › <span>Física</span></div>
+    <div class="area-placeholder">
+      <div class="ap-icon">🔬</div>
+      <h2>Física</h2>
+      <p>Contenido próximamente</p>
+    </div>
+  </section>
+
+  <!-- QUIMICA (placeholder) -->
+  <section class="page" id="page-quimica">
+    <div class="breadcrumb"><a onclick="navigate('areas')">Áreas</a> › <span>Química</span></div>
+    <div class="area-placeholder">
+      <div class="ap-icon">🧪</div>
+      <h2>Química</h2>
+      <p>Contenido próximamente</p>
+    </div>
+  </section>
+
+  <!-- BIOLOGIA (placeholder) -->
+  <section class="page" id="page-biologia">
+    <div class="breadcrumb"><a onclick="navigate('areas')">Áreas</a> › <span>Biología</span></div>
+    <div class="area-placeholder">
+      <div class="ap-icon">🧬</div>
+      <h2>Biología</h2>
+      <p>Contenido próximamente</p>
+    </div>
+  </section>
+
+  <!-- PRACTICAR HUB -->
+  <section class="page" id="page-practicar-hub">
+    <div class="section-header"><h2>Practicar</h2><p>Ejercicios, ensayos y tutor IA para reforzar lo aprendido.</p></div>
+    <div class="home-grid">
+      <div class="quick-action" onclick="navigate('practice')"><div class="qa-icon">✏️</div><div class="qa-title">Práctica Rápida</div><div class="qa-desc">5 ejercicios del banco o de un ensayo</div></div>
+      <div class="quick-action" onclick="navigate('errors')"><div class="qa-icon">🎯</div><div class="qa-title">Practicar Errores</div><div class="qa-desc">Refuerza tus áreas débiles</div></div>
+      <div class="quick-action" onclick="navigate('essays')"><div class="qa-icon">📝</div><div class="qa-title">Ensayos</div><div class="qa-desc">Mini ensayos y ensayos completos</div></div>
+      <div class="quick-action" onclick="navigate('tutor')"><div class="qa-icon">🤖</div><div class="qa-title">Tutor IA</div><div class="qa-desc">Resuelve dudas al instante</div></div>
+    </div>
+  </section>
+
+  <!-- MIS ENSAYOS HUB -->
+  <section class="page" id="page-misensayos-hub">
+    <div class="section-header"><h2>Mis Ensayos</h2><p>Registra puntajes de ensayos externos o sube uno nuevo para practicar.</p></div>
+    <div class="home-grid">
+      <div class="quick-action" onclick="navigate('registro')"><div class="qa-icon">📋</div><div class="qa-title">Registro de Puntajes</div><div class="qa-desc">Ensayos de colegio, preu, CyC, DEMRE</div></div>
+      <div class="quick-action" onclick="navigate('subir-ensayo')"><div class="qa-icon">📥</div><div class="qa-title">Subir Ensayo</div><div class="qa-desc">La IA extrae preguntas y clave</div></div>
+    </div>
+  </section>
+
+  <!-- HABILIDADES HUB -->
+  <section class="page" id="page-habilidades-hub">
+    <div class="section-header"><h2>Habilidades</h2><p>Vocabulario, guías de estudio y tips para rendir mejor.</p></div>
+    <div class="home-grid">
+      <div class="quick-action" onclick="navigate('vocab')"><div class="qa-icon">📖</div><div class="qa-title">Vocabulario PAES</div><div class="qa-desc">Palabra del día</div></div>
+      <div class="quick-action" onclick="navigate('wordbank')"><div class="qa-icon">🔍</div><div class="qa-title">Banco de Palabras</div><div class="qa-desc">Tus palabras guardadas</div></div>
+      <div class="quick-action" onclick="navigate('guides')"><div class="qa-icon">📚</div><div class="qa-title">Guías de Estudio</div><div class="qa-desc">Teoría + ejercicios por tema</div></div>
+      <div class="quick-action" onclick="navigate('mathTips')"><div class="qa-icon">💡</div><div class="qa-title">Tips Matemáticas</div><div class="qa-desc">Tip diario para resolver más rápido</div></div>
+    </div>
+  </section>
+
+  <!-- MATERIAL HUB -->
+  <section class="page" id="page-material-hub">
+    <div class="section-header"><h2>Material</h2><p>Sube, corrige y descarga tu material de estudio.</p></div>
+    <div class="home-grid">
+      <div class="quick-action" onclick="navigate('upload')"><div class="qa-icon">📤</div><div class="qa-title">Subir Guía</div><div class="qa-desc">La IA corrige tu PDF respondido</div></div>
+      <div class="quick-action" onclick="navigate('download')"><div class="qa-icon">⬇️</div><div class="qa-title">Descargar PDF</div><div class="qa-desc">Guías y ensayos para imprimir</div></div>
+      <div class="quick-action" onclick="navigate('books')"><div class="qa-icon">📕</div><div class="qa-title">Mis Libros</div><div class="qa-desc">Registra tus lecturas</div></div>
+      <div class="quick-action" onclick="navigate('dato')"><div class="qa-icon">🧠</div><div class="qa-title">Dato del Día</div><div class="qa-desc">Curiosidad de hoy sobre la PAES</div></div>
     </div>
   </section>
 
@@ -1132,6 +1211,17 @@ function updateStreak(){
   document.getElementById('streakCount').textContent=state.streak;
 }
 
+const PILL_MAP={home:'home',progress:'home',
+  areas:'areas',fisica:'areas',quimica:'areas',biologia:'areas',
+  'practicar-hub':'practicar-hub',practice:'practicar-hub',errors:'practicar-hub',essays:'practicar-hub',tutor:'practicar-hub','essay-active':'practicar-hub',
+  'misensayos-hub':'misensayos-hub',registro:'misensayos-hub','subir-ensayo':'misensayos-hub',
+  'habilidades-hub':'habilidades-hub',vocab:'habilidades-hub',wordbank:'habilidades-hub',guides:'habilidades-hub','guide-detail':'habilidades-hub',mathTips:'habilidades-hub',
+  'material-hub':'material-hub',upload:'material-hub',download:'material-hub',books:'material-hub',dato:'material-hub'};
+function setActivePill(key){
+  document.querySelectorAll('.pill').forEach(p=>p.classList.remove('on'));
+  const el=document.querySelector(`.pill[data-hub="${key}"]`);
+  if(el)el.classList.add('on');
+}
 function navigate(page){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -1139,7 +1229,8 @@ function navigate(page){
   if(pageEl)pageEl.classList.add('active');
   const navEl=document.querySelector(`.nav-item[onclick="navigate('${page}')"]`);
   if(navEl)navEl.classList.add('active');
-  const titles={home:'Inicio',tutor:'Tutor IA',guides:'Guías',practice:'Práctica Rápida',errors:'Practicar Errores',vocab:'Vocabulario',wordbank:'Banco de Palabras',mathTips:'Tips Matemáticas',dato:'Dato del Día',essays:'Ensayos',registro:'Mis Ensayos','subir-ensayo':'Subir Ensayo',progress:'Mi Progreso',books:'Mis Libros',upload:'Subir Guía',download:'Descargar PDF',admin:'Panel Admin','guide-detail':'Guías'};
+  setActivePill(PILL_MAP[page]||'');
+  const titles={home:'Inicio',tutor:'Tutor IA',guides:'Guías',practice:'Práctica Rápida',errors:'Practicar Errores',vocab:'Vocabulario',wordbank:'Banco de Palabras',mathTips:'Tips Matemáticas',dato:'Dato del Día',essays:'Ensayos',registro:'Mis Ensayos','subir-ensayo':'Subir Ensayo',progress:'Mi Progreso',books:'Mis Libros',upload:'Subir Guía',download:'Descargar PDF',admin:'Panel Admin','guide-detail':'Guías',areas:'Áreas de Estudio',fisica:'Física',quimica:'Química',biologia:'Biología','practicar-hub':'Practicar','misensayos-hub':'Mis Ensayos','habilidades-hub':'Habilidades','material-hub':'Material'};
   document.getElementById('topbarTitle').textContent=titles[page]||page;
   if(page==='home')renderHome();
   if(page==='tutor')renderTutor();
@@ -1912,6 +2003,7 @@ function startEssay(type){
   essayState={questions:finalQs,answers:new Array(finalQs.length).fill(null),cur:0,startTime:Date.now(),timer:null,type,totalTime:conf.time,label:conf.label,hardCount:conf.hardCount};
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-essay-active').classList.add('active');
+  setActivePill('practicar-hub');
   document.getElementById('topbarTitle').textContent=conf.label;
   renderEssayQ();
   essayState.timer=setInterval(()=>tickEssayTimer(),1000);
@@ -2355,8 +2447,6 @@ function handleAdminPDF(input){
 function openModal(html){document.getElementById('modalContent').innerHTML=html;document.getElementById('modalOverlay').classList.add('open');}
 function closeModal(){document.getElementById('modalOverlay').classList.remove('open');}
 function switchTab(tabId,btn){document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));btn.classList.add('active');document.getElementById(tabId)?.classList.add('active');}
-function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');}
-
 // ============================================================
 // REGISTRO DE ENSAYOS
 // ============================================================
@@ -2843,6 +2933,7 @@ function launchSubidoEssay(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-essay-active').classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  setActivePill('practicar-hub');
   document.getElementById('topbarTitle').textContent=e.nombre;
   renderEssayQ();
   essayState.timer=setInterval(()=>tickEssayTimer(),1000);
@@ -2889,7 +2980,6 @@ function init(){
   renderHome();
   setupTextSelection();
   checkReminders();
-  if(window.innerWidth<=768)document.getElementById('menuBtn').style.display='block';
   // Welcome for new users (streak starts at 0)
   if(!state.totalAnswers&&!state.essays&&state.streak===0){
     setTimeout(()=>{
